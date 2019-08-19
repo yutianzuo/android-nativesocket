@@ -122,7 +122,7 @@ public class RecvActivity extends AppCompatActivity {
                 for (Enumeration inetAddrs = iface.getInetAddresses(); inetAddrs.hasMoreElements();) {
                     InetAddress inetAddr = (InetAddress) inetAddrs.nextElement();
                     if (!inetAddr.isLoopbackAddress()) {// 排除loopback类型地址
-                        if (inetAddr.isSiteLocalAddress()) {
+                        if (inetAddr.isSiteLocalAddress() && inetAddr instanceof Inet4Address) {
                             // 如果是site-local地址，就是它了
                             return inetAddr;
                         } else if (candidateAddress == null) {
