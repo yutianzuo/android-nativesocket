@@ -16,6 +16,7 @@
 #include <fcntl.h>
 #include <errno.h>
 #include <string.h>
+#include <poll.h>
 #include "../transdata/transdata.h"
 
 #include "../android_utils.h"
@@ -30,7 +31,8 @@ class SocketBase
 public:
     enum
     {
-        MAXCONNECTIONS = 128,
+        MAXCONNECTIONS = 128, //bsd中如果设置backlog过小，并发会被服务端直接reset掉；然而linux的backlog含义跟bsd不一样。linux这里的长度
+        //是指等待accept的已经建立好的链接数；半连接维护在在另一个队列中，并且通过系统配置文件配置队列大小。
         MAXRECEIVEBUFF = 65536 * 3    //if test, = 4
     };
 
@@ -118,11 +120,12 @@ protected:
         memset(&m_addr, 0, sizeof(m_addr));
     }
 
+
+
     //server
     bool create()
     {
         m_sock = ::socket(PF_INET, SOCK_STREAM, 0);
-        std::string err = std::strerror(errno);
         if (!is_valid_socket())
         {
             STDCERR("socket()err");
@@ -157,7 +160,6 @@ protected:
     bool create_udp(int type = 0)
     {
         m_sock = ::socket(PF_INET, SOCK_DGRAM, 0);
-        std::string err = std::strerror(errno);
         if (!is_valid_socket())
         {
             STDCERR("setsockopt()err");
@@ -323,6 +325,50 @@ public:
     }
 
 
+    bool connect_timeout(const std::string &str_host, int port, int secs)
+    {
+        if (!is_valid_socket())
+        {
+            STDCERR("connect()err");
+            return false;
+        }
+        m_addr.sin_family = AF_INET;
+        m_addr.sin_port = htons(port);
+
+        ::inet_pton(AF_INET, str_host.c_str(), &m_addr.sin_addr);
+
+        if (errno == EAFNOSUPPORT)
+        {
+            STDCERR("errno == EAFNOSUPPORT");
+            close();
+            return false;
+        }
+
+        set_non_blocking(true);
+        int con_ret = ::connect(m_sock, (sockaddr *) &m_addr, sizeof(m_addr));
+        if (con_ret == -1 && errno != EINPROGRESS)
+        {
+            STDCERR("connect_timeout--errno != EINPROGRESS");
+            close();
+            return false;
+        }
+
+        pollfd pfd_listen = {0};
+        pfd_listen.fd = m_sock;
+        pfd_listen.events = POLLIN | POLLOUT;
+        int ret = ::poll(&pfd_listen, 1, secs * 1000);
+        if (ret <= 0)
+        {
+            STDCERR("connect timeout OR error occured");
+            close();
+            return false;
+        }
+
+        set_non_blocking(false);
+        return true;
+    }
+
+
     //data trans
     bool send(const std::string &data)
     {
@@ -336,7 +382,6 @@ public:
 #endif
         int status = ::send(m_sock, data.c_str(), data.size(), n_flags);
         //std::cout << "send()status:" << status << std::endl;
-        STDCERR("send data length:%d", status);
         return status != -1;
     }
 
@@ -391,7 +436,7 @@ public:
             }
             else
             {
-                STDCERR("receive()err %s", std::strerror(errno));
+                STDCERR("receive()err");
                 if (errno == EINTR)
                 {
                     //忽略此信号

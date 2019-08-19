@@ -38,7 +38,7 @@ public:
             return false;
         }
 
-        if (!connect(host, port)) //connection
+        if (!connect_timeout(host, port, 5)) //connection
         {
             close();
             return false;

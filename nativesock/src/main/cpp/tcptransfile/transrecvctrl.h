@@ -110,13 +110,14 @@ public:
 
             //android中 close掉了listen的socket，poll一直返回1。
             //并且返回的revents是32。
-            if (!(vec_pollfd[0].revents & POLL_IN) && !m_sock_listen.is_valid_socket())
+            if (!(vec_pollfd[0].revents & POLLIN) && !m_sock_listen.is_valid_socket())
             {
                 break;
             }
 
-            if (vec_pollfd[0].revents & POLL_IN)
+            if (vec_pollfd[0].revents & POLLIN)
             {
+                STDCOUT("trans thread create");
                 start_update = true;
                 TransFileTcpRecv sock;
                 bool b_ret = m_sock_listen.accept(sock);
@@ -210,6 +211,7 @@ private:
         }
         if (!done && m_thread_count == 0 && ++timeout > 4)
         {
+            STDCERR("trans imcomplete, will quit, please trans again");
             m_sock_listen.close();
         }
     }
