@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <integer-array name="pieces">
+        <item >1</item>
+        <item >2</item>
+        <item >4</item>
+        <item >8</item>
+        <item >16</item>
+    </integer-array>
+
+    <string-array name="week">
+        <item >星期一</item>
+        <item >星期二</item>
+        <item >星期三</item>
+        <item >星期四</item>
+        <item >星期五</item>
+        <item >星期六</item>
+        <item >星期天</item>
+    </string-array>
+</resources>

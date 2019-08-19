@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="utf-8"?>
+<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent">
+
+    <TextView
+        android:id="@+id/tv_filesend"
+        android:layout_width="match_parent"
+        android:layout_height="60dp"
+        android:ellipsize="end"
+        android:gravity="center"
+        android:singleLine="true"
+        android:text="点击选择要发送的文件"/>
+
+    <EditText
+        android:id="@+id/et_ip"
+        android:layout_width="match_parent"
+        android:layout_height="50dp"
+        android:layout_below="@+id/tv_filesend"
+        android:layout_marginTop="20dp"
+        android:hint="输入目标机器ip:192.168.0.56"/>
+
+    <Button
+        android:layout_marginTop="40dp"
+        android:layout_below="@+id/et_ip"
+        android:id="@+id/btn_send"
+        android:text="开始"
+        android:layout_width="match_parent"
+        android:layout_height="50dp"/>
+
+
+</RelativeLayout>
