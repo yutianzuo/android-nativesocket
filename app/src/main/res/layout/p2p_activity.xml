@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent">
+
+    <Button
+        android:id="@+id/btn_search"
+        android:text="Search"
+        android:textSize="32dp"
+        android:layout_width="match_parent"
+        android:layout_height="60dp"/>
+
+    <ListView
+        android:layout_below="@+id/btn_search"
+        android:id="@+id/lv_device"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="30dp"/>
+
+
+</RelativeLayout>

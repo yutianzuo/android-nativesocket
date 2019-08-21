@@ -70,7 +70,7 @@ public class RecvActivity extends AppCompatActivity {
                 InetAddress addr = null;
                 try {
                     addr = getLocalHostLANAddress();
-                    final String hostip = addr.toString();
+                    final String hostip = addr.getHostAddress();
                     RecvActivity.this.runOnUiThread(new Runnable() {
                         @Override
                         public void run() {
@@ -113,8 +113,10 @@ public class RecvActivity extends AppCompatActivity {
     }
     /////////////////////////////////////////////////////
     private static InetAddress getLocalHostLANAddress() throws UnknownHostException {
+
         try {
             InetAddress candidateAddress = null;
+            InetAddress p2p = null;
             // 遍历所有的网络接口
             for (Enumeration ifaces = NetworkInterface.getNetworkInterfaces(); ifaces.hasMoreElements();) {
                 NetworkInterface iface = (NetworkInterface) ifaces.nextElement();
@@ -123,7 +125,14 @@ public class RecvActivity extends AppCompatActivity {
                     InetAddress inetAddr = (InetAddress) inetAddrs.nextElement();
                     if (!inetAddr.isLoopbackAddress()) {// 排除loopback类型地址
                         if (inetAddr.isSiteLocalAddress() && inetAddr instanceof Inet4Address) {
+                            if (iface.getName().contains("p2p") && iface.isUp()) {
+                                return inetAddr;
+                            }
                             // 如果是site-local地址，就是它了
+                            if (p2p == null) {
+                                candidateAddress = inetAddr;
+                                continue;
+                            }
                             return inetAddr;
                         } else if (candidateAddress == null) {
                             // site-local类型的地址未被发现，先记录候选地址

@@ -22,11 +22,13 @@ import com.github.yutianzuo.nativesock.JniDef;
 import java.io.File;
 
 public class SendFileActivity extends AppCompatActivity implements View.OnClickListener {
+    public static final String IP_ADDR = "ip_addr";
     TextView mTvSendFile;
     String mFileSend;
     Button mBtnSend;
     EditText mEtIp;
     static final int REQUEST_CODE = 999;
+    String ip;
 
     private void browser() {
         Intent intent = new Intent(Intent.ACTION_GET_CONTENT);
@@ -39,9 +41,15 @@ public class SendFileActivity extends AppCompatActivity implements View.OnClickL
     protected void onCreate(@Nullable Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_send);
+        ip = getIntent().getStringExtra(IP_ADDR);
+        if (TextUtils.isEmpty(ip)) {
+            ip = "";
+        }
         mBtnSend = findViewById(R.id.btn_send);
         mTvSendFile = findViewById(R.id.tv_filesend);
         mEtIp = findViewById(R.id.et_ip);
+        mEtIp.setText(ip);
+        mEtIp.setSelection(ip.length());
         mTvSendFile.setOnClickListener(this);
         mBtnSend.setOnClickListener(this);
     }
