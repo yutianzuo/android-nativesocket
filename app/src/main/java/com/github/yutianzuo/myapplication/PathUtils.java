@@ -11,6 +11,8 @@ import android.provider.DocumentsContract;
 import android.provider.MediaStore;
 import android.util.Log;
 
+import java.io.File;
+
 public class PathUtils {
     /**
      * 根据Uri获取图片绝对路径，解决Android4.4以上版本Uri转换
@@ -91,6 +93,26 @@ public class PathUtils {
             Log.e("browser", e.getMessage());
         } finally {
             if (cursor != null) { cursor.close(); }
+        }
+
+        return getPathWhenError(uri);
+    }
+
+    private static String getPathWhenError(Uri uri) {
+        File file = new File(uri.getPath());
+        String path = file.getAbsolutePath();
+        int index = 0;
+        while (!file.isFile()) {
+            index = path.indexOf("/", index);
+            if (index < 0) {
+                break;
+            }
+            String tmpPath = path.substring(index, path.length());
+            if (new File (tmpPath).isFile()) {
+                return tmpPath;
+            }
+            ++index;
+
         }
         return null;
     }
