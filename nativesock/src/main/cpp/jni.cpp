@@ -137,6 +137,7 @@ jstring Java_com_github_yutianzuo_nativesock_JniDef_sendFile(JNIEnv *env, jclass
 }
 
 jobject g_obj = nullptr;
+TransRecvCtrl* g_recv = nullptr;
 
 void Java_com_github_yutianzuo_nativesock_JniDef_recvFile(JNIEnv *env, jclass jobj, jstring dir, jint pieces, jobject
 callback) {
@@ -152,8 +153,12 @@ callback) {
         str_dir = env->GetStringUTFChars(dir, 0);
     }
     /////
-    TransRecvCtrl recv(str_dir);
-    recv.set_callback([](const char* out)->void {
+    std::shared_ptr<TransRecvCtrl> sp_recv(new (std::nothrow) TransRecvCtrl(str_dir), [](TransRecvCtrl* recv)->void {
+        g_recv = nullptr;
+        delete recv;
+    });
+    g_recv = sp_recv.get();
+    sp_recv->set_callback([](const char* out)->void {
         JNIEnvPtr jnienv_holder;
         if (g_obj) {
             jclass clazz = jnienv_holder->GetObjectClass(g_obj);
@@ -167,8 +172,8 @@ callback) {
             jnienv_holder->CallVoidMethod(g_obj, method, jout);
         }
     });
-    recv.init(pieces);
-    recv.start_poll();
+    sp_recv->init(pieces);
+    sp_recv->start_poll();
 
 
     if (str_dir) {
@@ -180,6 +185,14 @@ void Java_com_github_yutianzuo_nativesock_JniDef_recvDone(JNIEnv *env, jclass jo
     if (g_obj) {
         env->DeleteGlobalRef(g_obj);
         g_obj = nullptr;
+    }
+}
+
+
+void Java_com_github_yutianzuo_nativesock_JniDef_quitListeningOrRecvingFile(JNIEnv *env, jclass jobj) {
+    if (g_recv) {
+        g_recv->quit_listening();
+        g_recv = nullptr;
     }
 
 }

@@ -119,19 +119,6 @@ public class WifiP2pActivity extends AppCompatActivity implements WifiP2pActionL
     protected void onDestroy() {
         super.onDestroy();
         quitGroup();
-//        if (bConnected) {
-//            mWifiP2pManager.cancelConnect(mChannel, new ActionListener() {
-//                @Override
-//                public void onSuccess() {
-//                    Log.e(TAG, "断开连接ok");
-//                }
-//
-//                @Override
-//                public void onFailure(int reason) {
-//                    Log.e(TAG, "断开连接failed" + reason);
-//                }
-//            });
-//        }
     }
 
     private void showWaitingDlg() {

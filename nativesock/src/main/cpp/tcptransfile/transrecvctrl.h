@@ -124,6 +124,7 @@ public:
                 if (b_ret)
                 {
                     ++m_thread_count;
+                    m_socks_trans.push_back(sock.get_socket());
                     std::thread t(m_threadfunc, std::move(sock));
                     t.detach();
                 }
@@ -141,6 +142,22 @@ public:
         m_callback = func;
     }
 
+    void quit_listening()
+    {
+        if (!m_socks_trans.empty())
+        {
+            for (auto sock : m_socks_trans)
+            {
+                ::shutdown(sock, SHUT_RDWR);
+                ::close(sock);
+            }
+        }
+        else
+        {
+            m_sock_listen.close();
+        }
+    }
+
 private:
     std::function<void(const char*)> m_callback;
     int m_pieces;
@@ -156,6 +173,8 @@ private:
     std::chrono::milliseconds::rep last_time = 0;
     std::uint64_t delta = 0;
     int timeout = 0;
+
+    std::vector<int> m_socks_trans;
 
     bool update_file_piece_data(const char* buff, int len, picec_info* info)
     {

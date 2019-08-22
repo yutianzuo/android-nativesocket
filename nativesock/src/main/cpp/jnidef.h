@@ -32,6 +32,13 @@ void
 JNICALL
 Java_com_github_yutianzuo_nativesock_JniDef_recvDone(JNIEnv *env, jclass jobj);
 
+
+JNIEXPORT
+void
+JNICALL
+Java_com_github_yutianzuo_nativesock_JniDef_quitListeningOrRecvingFile(JNIEnv *env, jclass jobj);
+
+
 #ifdef __cplusplus
 };
 #endif

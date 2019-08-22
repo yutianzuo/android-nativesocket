@@ -103,6 +103,27 @@ public class RecvActivity extends AppCompatActivity {
         });
     }
 
+    @Override
+    public void onBackPressed() {
+        if (!mBtnRecv.isEnabled()) {
+            BaseDialog.newBuilder(this).setText(BaseDialog.MESSAGE_VIEW, "正在接收文件，是否退出？").
+                    setText(BaseDialog.LEFT_VIEW, "是", new OnClickListener() {
+                        @Override
+                        public void onClick(View v) {
+                            JniDef.quitListeningOrRecvingFile();
+                        }
+                    }).
+                    setText(BaseDialog.RIGHT_VIEW, "否", new OnClickListener() {
+                        @Override
+                        public void onClick(View v) {
+                        }
+                    }).widthPercent(0.7f).
+                    show();
+        } else {
+            super.onBackPressed();
+        }
+    }
+
     void callBack(final String info) {
         this.runOnUiThread(new Runnable() {
             @Override

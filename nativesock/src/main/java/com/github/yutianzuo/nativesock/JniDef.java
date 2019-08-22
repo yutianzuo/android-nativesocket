@@ -12,4 +12,6 @@ public class JniDef {
     public static native void recvFile(String dir, int pieces, Object callback);
 
     public static native void recvDone();
+
+    public static native void quitListeningOrRecvingFile();
 }
