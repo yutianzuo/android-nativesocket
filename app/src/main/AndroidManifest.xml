@@ -32,6 +32,7 @@
         <activity android:name=".SendFileActivity"/>
         <activity android:name=".RecvActivity"/>
         <activity android:name=".WifiP2pActivity"/>
+        <activity android:name=".WifiP2pDynamicOwnerActivity"/>
     </application>
 
 </manifest>

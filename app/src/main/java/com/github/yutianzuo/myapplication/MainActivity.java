@@ -11,6 +11,7 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
 
     Button mButtonDns;
     Button mButtonNetChoose;
+    Button mButtonP2p;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -18,10 +19,12 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
         setContentView(R.layout.activity_main);
         mButtonDns = findViewById(R.id.btn_dns);
         mButtonNetChoose = findViewById(R.id.btn_netchoose);
+        mButtonP2p = findViewById(R.id.btn_p2p);
 
 
         mButtonDns.setOnClickListener(this);
         mButtonNetChoose.setOnClickListener(this);
+        mButtonP2p.setOnClickListener(this);
 
     }
 
@@ -34,7 +37,15 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
             case R.id.btn_netchoose:
                 chooseNet();
                 break;
+            case R.id.btn_p2p:
+                P2P();
+                break;
         }
+    }
+
+    private void P2P() {
+        Intent intent = new Intent(MainActivity.this, WifiP2pDynamicOwnerActivity.class);
+        this.startActivity(intent);
     }
 
     private void dns() {
