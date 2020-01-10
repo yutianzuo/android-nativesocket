@@ -5,6 +5,8 @@
 #ifndef SIMPLESOCKET_DNS_H
 #define SIMPLESOCKET_DNS_H
 
+#include <sstream>
+
 #include "../socket/simpleudpclient.h"
 #include "../toolbox/timeutils.h"
 #include "../toolbox/miscs.h"
@@ -61,7 +63,13 @@ public:
             }
             SimpleUdpClient::set_check_data(false);
             SimpleUdpClient::set_non_blocking(true);
-            if (!SimpleUdpClient::operator<<(dns_query(str_host_query)))
+            std::string str_query = dns_query(str_host_query);
+            if (str_query.empty())
+            {
+                m_last_errmsg = NORMAL_ERROR_MSG("construct query failed, possiblly domain label too long");
+                FUNCTION_LEAVE;
+            }
+            if (!SimpleUdpClient::operator<<(str_query))
             {
                 m_last_errmsg = NORMAL_ERROR_MSG("send msg failed");
                 FUNCTION_LEAVE;
@@ -114,6 +122,7 @@ private:
         DnsHeader header = {0};
         header.trans_id = htons((std::int16_t)trans_id);
 
+        //Do query recursively
         header.flags[0] = 1;
         header.flags[1] = 0;//flags  0 0000 0 1 0000 0000
 
@@ -132,6 +141,11 @@ private:
         ///queries
         for (const auto &host : hosts)
         {
+            if (host.size() > 0x3f) //00xx xxxx domain label MUST NOT > 0x3f(0011 1111)
+            {
+                return "";
+            }
+
             buff[index++] = host.size();
             for (auto c : host)
             {
@@ -189,6 +203,34 @@ private:
         return ret;
     }
 
+    int caulMessageNameSize(const std::string &str_respones, int index)
+    {
+        if (!check_index(index, str_respones))
+        {
+            return INT_MAX;
+        }
+
+        //caution:
+        //this equals 0xffff ffc0 & 0x0000 00c0 -> 0x000000c0 -> > 0 -> true
+        if (str_respones[index] & 0xc0) //11xx xxxx-->represents a pointer
+        {
+            return 2;
+        }
+        else
+        {
+            int count = 0;
+            for (const auto& c : str_respones)
+            {
+                ++count;
+                if (c == 0)
+                {
+                    break;
+                }
+            }
+            return count;
+        }
+    }
+
     bool analyze_answers(int &index, const std::string &str_respones, int answers, std::vector<std::string> &ips)
     {
         bool ret = false;
@@ -200,6 +242,28 @@ private:
             }
 
             //2bytes-->Name; 2bytes-->type; 2bytes-->class; 4bytes-->time; 2bytes-->lenth; 4bytes-->ipv4;
+            //answer的最短字节数为16，as above shows，Name是可变的，遵循message compression
+            //The compression scheme allows a domain name in a message to be
+            //represented as either:
+            //
+            //   - a sequence of labels ending in a zero octet
+            //
+            //   - a pointer
+            //
+            //   - a sequence of labels ending with a pointer
+            //The pointer takes the form of a two octet sequence:
+            //
+            //    +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
+            //    | 1  1|                OFFSET                   |
+            //    +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
+            //The first two bits are ones.  This allows a pointer to be distinguished
+            //from a label, since the label must begin with two zero bits because
+            //labels are restricted to 63 octets or less.  (The 10 and 01 combinations
+            //are reserved for future use.)  The OFFSET field specifies an offset from
+            //the start of the message (i.e., the first octet of the ID field in the
+            //domain header).  A zero offset specifies the first byte of the ID field,
+            //etc.
+            //more:https://tools.ietf.org/rfc/rfc1035.txt
             if (index_inner + answers * 16 > str_respones.size()) //check A record * count bytes
             {
                 m_last_errmsg = NORMAL_ERROR_MSG("answer's size error");
@@ -208,20 +272,39 @@ private:
 
             for (int i = 0; i < answers; ++i)
             {
-                index_inner += 2; //jump name
+                index_inner += caulMessageNameSize(str_respones, index_inner); //jump name
+
+                if (!check_index(index_inner, str_respones))
+                {
+                    continue;
+                }
 
                 std::uint16_t type = ntohs(* ((std::int16_t*) &str_respones[index_inner]));//type
                 index_inner += 2;
+
+                if (!check_index(index_inner, str_respones))
+                {
+                    continue;
+                }
                 std::uint16_t query_class = ntohs(*((std::int16_t*) &str_respones[index_inner]));//class
                 index_inner += 2;
 
                 index_inner += 4; //jump live time
+
+                if (!check_index(index_inner, str_respones))
+                {
+                    continue;
+                }
 
                 std::uint16_t len = ntohs(* ((std::int16_t*) &str_respones[index_inner]));//length
                 index_inner += 2;
                 if (type != 1 || query_class != 1 || len != 4) // like cname
                 {
                     index_inner += len;
+                    continue;
+                }
+                if (!check_index(index_inner, str_respones))
+                {
                     continue;
                 }
                 int ip = *((int *) (&str_respones[index_inner]));
