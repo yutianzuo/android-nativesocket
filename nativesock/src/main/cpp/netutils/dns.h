@@ -308,7 +308,7 @@ private:
                     continue;
                 }
                 int ip = *((int *) (&str_respones[index_inner]));
-                std::string str_ip = NetHelper::int32_to_string_addr(ip);
+                std::string str_ip = NetHelper::ipv4_to_string_addr(ip);
                 ips.emplace_back(std::move(str_ip));
                 index_inner += 4;
             }
@@ -317,6 +317,48 @@ private:
             ret = true;
         FUNCTION_END;
         return ret;
+    }
+
+    int getName(const std::string &str_respones, int index_inner, std::string &str_host)
+    {
+        int jump = 0;
+        while (str_respones[index_inner] != 0)
+        {
+            if (!check_index(index_inner, str_respones))
+            {
+                index_inner = str_respones.size();
+                break;
+            }
+            if (jump == 0)
+            {
+                jump = (unsigned char) str_respones[index_inner++];
+            }
+            else
+            {
+                if (jump & 0xc0) //encounter a pointer
+                {
+                    //just move on
+                    ++index_inner;
+                    jump = 0;
+                }
+                else
+                {
+                    if (index_inner + jump <= str_respones.size())
+                    {
+                        str_host.append(&str_respones[index_inner], jump);
+                        str_host.append(".");
+                    }
+                    index_inner += jump;
+                    jump = 0;
+                }
+            }
+        }
+        if (str_host.size())
+        {
+            str_host.erase(str_host.size() - 1);
+        }
+        ++index_inner; //jump '\0'
+        return index_inner;
     }
 
     bool analyze_queries(int &index, const std::string &str_respones, std::string &str_host)
@@ -330,33 +372,17 @@ private:
                 FUNCTION_LEAVE;
             }
 
-            int jump = 0;
-            while (str_respones[index_inner] != 0)
+            if (str_respones[index_inner] & 0xc0) //name is a pointer
             {
-                if (!check_index(index_inner, str_respones))
-                {
-                    break;
-                }
-                if (jump == 0)
-                {
-                    jump = (unsigned char) str_respones[index_inner++];
-                }
-                else
-                {
-                    if (index_inner + jump <= str_respones.size())
-                    {
-                        str_host.append(&str_respones[index_inner], jump);
-                        str_host.append(".");
-                    }
-                    index_inner += jump;
-                    jump = 0;
-                }
+                int index_pointer = (((~0xc0 & 0xff) & str_respones[index_inner]) << 8) |
+                        (str_respones[index_inner + 1] & 0xff);
+                getName(str_respones, index_pointer, str_host);
+                index_inner += 2;
             }
-            if (str_host.size())
-            {
-                str_host.erase(str_host.size() - 1);
+            else
+            { //name can be labels combines pointer, which is not handled
+                index_inner = getName(str_respones, index_inner, str_host);
             }
-            ++index_inner; //jump '\0'
 
             if (!check_index(index_inner + 4, str_respones))
             {
@@ -472,7 +498,9 @@ private:
 
     bool check_index(int index, const std::string &respones)
     {
-        if (index >= respones.size())
+        //如果index溢出，index将变为一个负数，但是respones.size()返回的是一个size_t（unsigned int），比较会隐式转换
+        //将index这个int提升为unsigned int, 这时会是一个巨大的数。从而可能带来意外的结果。这里不判断index>=0，结果也是正确的。
+        if (index >= 0 && index >= respones.size())
         {
             return false;
         }

@@ -20,15 +20,42 @@
 #include "../toolbox/string_x.h"
 
 
+inline std::string get_error_info(const std::string& msg)
+{
+    std::ostringstream ss;
+    ss << "error(";
+    ss << msg;
+    ss << ") in";
+    ss << __FILE__;
+    ss << ", line:";
+    ss << __LINE__;
+    return ss.str();
+}
+
+inline std::string get_errorno_info(const std::string& msg)
+{
+    std::ostringstream ss;
+    ss << "error(";
+    ss << msg;
+    ss << ") errorno(";
+    ss << std::strerror(errno);
+    ss << ") in";
+    ss << __FILE__;
+    ss << ", line:";
+    ss << __LINE__;
+    return ss.str();
+}
+
+
+
 
 ///////////////////////////////////
 #ifndef NORMAL_ERROR_MSG
-#define NORMAL_ERROR_MSG(msg) (std::ostringstream() << "error(" << msg << ") in " << __FILE__ << ", line:" << __LINE__).str()
+#define NORMAL_ERROR_MSG(msg) get_error_info(msg)
 #endif
 
 #ifndef NORMAL_ERROR_NUM
-#define NORMAL_ERROR_NUM(msg) (std::ostringstream() << "error(" << msg << ") errorno(" << std::strerror(errno) << ") in "\
-<< __FILE__ << ", line:" << __LINE__).str()
+#define NORMAL_ERROR_NUM(msg) get_errorno_info(msg)
 #endif
 
 #ifndef STD_COUT_ERRORMSG
@@ -51,12 +78,27 @@ class NetHelper final
 {
 public:
     NetHelper() = delete;
-    static std::string int32_to_string_addr(int addr)
+    static std::string ipv4_to_string_addr(int addr)
     {
         in_addr addrin = {0};
         addrin.s_addr = addr;
         return stringxa(::inet_ntoa(addrin));
     }
+
+    static std::string safe_ipv4_to_string_addr(int addr)
+    {
+        const int len = 32;
+        char buff[len] = {0};
+        return stringxa(::inet_ntop(AF_INET, &addr, buff, len));
+    }
+
+    static std::string safe_ipv6_to_string_addr(const in6_addr* addr)
+    {
+        const int len = 64;
+        char buff[len] = {0};
+        return stringxa(::inet_ntop(AF_INET6, addr, buff, len));
+    }
+
 };
 
 #endif //SIMPLESOCKET_ERRORHUNTER_H
