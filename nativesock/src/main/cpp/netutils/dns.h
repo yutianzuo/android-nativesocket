@@ -473,6 +473,12 @@ private:
             //0x000000
             //Z(reserved 0)
 
+            if (recursion_desired == 0 || (recursion_desired == 1 && recursion_available != 1))
+            {
+                m_last_errmsg = NORMAL_ERROR_MSG("server cant do recursive search");
+                FUNCTION_LEAVE;
+            }
+
             //00x00000
             int answer_authenticated =
                     (buff[1] & 0x20) >> 5; //Answer authenticated: 0, Answer/authority portion was not
