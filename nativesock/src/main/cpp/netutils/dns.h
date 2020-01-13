@@ -66,7 +66,7 @@ public:
             std::string str_query = dns_query(str_host_query);
             if (str_query.empty())
             {
-                m_last_errmsg = NORMAL_ERROR_MSG("construct query failed, possiblly domain label too long");
+                m_last_errmsg = NORMAL_ERROR_MSG("construct query failed, possibly domain label too long");
                 FUNCTION_LEAVE;
             }
             if (!SimpleUdpClient::operator<<(str_query))
@@ -77,23 +77,23 @@ public:
 
             ////
             int counter = 0;
-            std::string respones;
+            std::string response;
             while (counter++ < 20)
             {
-                if (SimpleUdpClient::operator>>(respones))
+                if (SimpleUdpClient::operator>>(response))
                 {
                     break;
                 }
                 TimeUtils::sleep_for_millis(100);
             }
 
-            if (!respones.empty())
+            if (!response.empty())
             {
-                ret = analyze(respones, ips);
+                ret = analyze(response, ips);
             }
             else
             {
-                m_last_errmsg = NORMAL_ERROR_MSG("respones is empty");
+                m_last_errmsg = NORMAL_ERROR_MSG("response is empty");
             }
         FUNCTION_END;
         return ret;
@@ -168,14 +168,14 @@ private:
 //////////////////////////////////////////////////////////////////////////////////////////////
 
     ///analyze respones
-    bool analyze(const std::string &str_respones, std::vector<std::string> &str_ips)
+    bool analyze(const std::string &str_response, std::vector<std::string> &str_ips)
     {
         bool ret = false;
         FUNCTION_BEGIN ;
             int index = 0;
             int answers = 0;
             ///header
-            if (!analyze_header(index, str_respones, answers))
+            if (!analyze_header(index, str_response, answers))
             {
                 FUNCTION_LEAVE;
             }
@@ -183,7 +183,7 @@ private:
 
             ///queries
             std::string str_host;
-            if (!analyze_queries(index, str_respones, str_host))
+            if (!analyze_queries(index, str_response, str_host))
             {
                 m_last_errmsg = NORMAL_ERROR_MSG("analyze_queries failed");
                 FUNCTION_LEAVE;
@@ -191,7 +191,7 @@ private:
             ///queries end
 
             ///answers
-            if (!analyze_answers(index, str_respones, answers, str_ips))
+            if (!analyze_answers(index, str_response, answers, str_ips))
             {
                 m_last_errmsg = NORMAL_ERROR_MSG("analyze_answers failed");
                 FUNCTION_LEAVE;
@@ -203,23 +203,23 @@ private:
         return ret;
     }
 
-    int caulMessageNameSize(const std::string &str_respones, int index)
+    int calc_message_name_size(const std::string &str_response, int index)
     {
-        if (!check_index(index, str_respones))
+        if (!check_index(index, str_response))
         {
             return INT_MAX;
         }
 
         //caution:
         //this equals 0xffff ffc0 & 0x0000 00c0 -> 0x000000c0 -> > 0 -> true
-        if (str_respones[index] & 0xc0) //11xx xxxx-->represents a pointer
+        if (str_response[index] & 0xc0) //11xx xxxx-->represents a pointer
         {
             return 2;
         }
         else
         {
             int count = 0;
-            for (const auto& c : str_respones)
+            for (const auto& c : str_response)
             {
                 ++count;
                 if (c == 0)
@@ -231,12 +231,12 @@ private:
         }
     }
 
-    bool analyze_answers(int &index, const std::string &str_respones, int answers, std::vector<std::string> &ips)
+    bool analyze_answers(int &index, const std::string &str_response, int answers, std::vector<std::string> &ips)
     {
         bool ret = false;
         int index_inner = index;
         FUNCTION_BEGIN ;
-            if (!check_index(index_inner, str_respones))
+            if (!check_index(index_inner, str_response))
             {
                 FUNCTION_LEAVE;
             }
@@ -264,7 +264,7 @@ private:
             //domain header).  A zero offset specifies the first byte of the ID field,
             //etc.
             //more:https://tools.ietf.org/rfc/rfc1035.txt
-            if (index_inner + answers * 16 > str_respones.size()) //check A record * count bytes
+            if (index_inner + answers * 16 > str_response.size()) //check A record * count bytes
             {
                 m_last_errmsg = NORMAL_ERROR_MSG("answer's size error");
                 FUNCTION_LEAVE;
@@ -272,42 +272,42 @@ private:
 
             for (int i = 0; i < answers; ++i)
             {
-                index_inner += caulMessageNameSize(str_respones, index_inner); //jump name
+                index_inner += calc_message_name_size(str_response, index_inner); //jump name
 
-                if (!check_index(index_inner, str_respones))
+                if (!check_index(index_inner, str_response))
                 {
                     continue;
                 }
 
-                std::uint16_t type = ntohs(* ((std::int16_t*) &str_respones[index_inner]));//type
+                std::uint16_t type = ntohs(* ((std::int16_t*) &str_response[index_inner]));//type
                 index_inner += 2;
 
-                if (!check_index(index_inner, str_respones))
+                if (!check_index(index_inner, str_response))
                 {
                     continue;
                 }
-                std::uint16_t query_class = ntohs(*((std::int16_t*) &str_respones[index_inner]));//class
+                std::uint16_t query_class = ntohs(*((std::int16_t*) &str_response[index_inner]));//class
                 index_inner += 2;
 
                 index_inner += 4; //jump live time
 
-                if (!check_index(index_inner, str_respones))
+                if (!check_index(index_inner, str_response))
                 {
                     continue;
                 }
 
-                std::uint16_t len = ntohs(* ((std::int16_t*) &str_respones[index_inner]));//length
+                std::uint16_t len = ntohs(* ((std::int16_t*) &str_response[index_inner]));//length
                 index_inner += 2;
                 if (type != 1 || query_class != 1 || len != 4) // like cname
                 {
                     index_inner += len;
                     continue;
                 }
-                if (!check_index(index_inner, str_respones))
+                if (!check_index(index_inner, str_response))
                 {
                     continue;
                 }
-                int ip = *((int *) (&str_respones[index_inner]));
+                int ip = *((int *) (&str_response[index_inner]));
                 std::string str_ip = NetHelper::ipv4_to_string_addr(ip);
                 ips.emplace_back(std::move(str_ip));
                 index_inner += 4;
@@ -319,19 +319,19 @@ private:
         return ret;
     }
 
-    int getName(const std::string &str_respones, int index_inner, std::string &str_host)
+    int get_message_name(const std::string &str_response, int index_inner, std::string &str_host)
     {
         int jump = 0;
-        while (str_respones[index_inner] != 0)
+        while (str_response[index_inner] != 0)
         {
-            if (!check_index(index_inner, str_respones))
+            if (!check_index(index_inner, str_response))
             {
-                index_inner = str_respones.size();
+                index_inner = str_response.size();
                 break;
             }
             if (jump == 0)
             {
-                jump = (unsigned char) str_respones[index_inner++];
+                jump = (unsigned char) str_response[index_inner++];
             }
             else
             {
@@ -343,9 +343,9 @@ private:
                 }
                 else
                 {
-                    if (index_inner + jump <= str_respones.size())
+                    if (index_inner + jump <= str_response.size())
                     {
-                        str_host.append(&str_respones[index_inner], jump);
+                        str_host.append(&str_response[index_inner], jump);
                         str_host.append(".");
                     }
                     index_inner += jump;
@@ -361,37 +361,37 @@ private:
         return index_inner;
     }
 
-    bool analyze_queries(int &index, const std::string &str_respones, std::string &str_host)
+    bool analyze_queries(int &index, const std::string &str_response, std::string &str_host)
     {
         bool ret = false;
         int index_inner = index;
         str_host.clear();
         FUNCTION_BEGIN ;
-            if (!check_index(index_inner, str_respones))
+            if (!check_index(index_inner, str_response))
             {
                 FUNCTION_LEAVE;
             }
 
-            if (str_respones[index_inner] & 0xc0) //name is a pointer
+            if (str_response[index_inner] & 0xc0) //name is a pointer
             {
-                int index_pointer = (((~0xc0 & 0xff) & str_respones[index_inner]) << 8) |
-                        (str_respones[index_inner + 1] & 0xff);
-                getName(str_respones, index_pointer, str_host);
+                int index_pointer = (((~0xc0 & 0xff) & str_response[index_inner]) << 8) |
+                        (str_response[index_inner + 1] & 0xff);
+                get_message_name(str_response, index_pointer, str_host);
                 index_inner += 2;
             }
             else
             { //name can be labels combines pointer, which is not handled
-                index_inner = getName(str_respones, index_inner, str_host);
+                index_inner = get_message_name(str_response, index_inner, str_host);
             }
 
-            if (!check_index(index_inner + 4, str_respones))
+            if (!check_index(index_inner + 4, str_response))
             {
                 FUNCTION_LEAVE;
             }
 
-            std::uint16_t type = ntohs(* ((std::int16_t*) &str_respones[index_inner]));//type shoud be an A(ipv4)
+            std::uint16_t type = ntohs(* ((std::int16_t*) &str_response[index_inner]));//type shoud be an A(ipv4)
             index_inner += 2;
-            std::uint16_t query_class = ntohs(*((std::int16_t*) &str_respones[index_inner]));//class should be IN
+            std::uint16_t query_class = ntohs(*((std::int16_t*) &str_response[index_inner]));//class should be IN
             index_inner += 2;
 
             if (type != 1 || query_class != 1)
@@ -404,16 +404,16 @@ private:
         return ret;
     }
 
-    bool analyze_header(int &index, const std::string &str_respones, int &answers)
+    bool analyze_header(int &index, const std::string &str_response, int &answers)
     {
         bool ret = false;
         int index_inner = index;
         FUNCTION_BEGIN ;
-            if (str_respones.size() < sizeof(DnsHeader))
+            if (str_response.size() < sizeof(DnsHeader))
             {
                 FUNCTION_LEAVE;
             }
-            DnsHeader* header = (DnsHeader*)(&str_respones[index_inner]);
+            DnsHeader* header = (DnsHeader*)(&str_response[index_inner]);
             if ((std::int16_t)(ntohs(header->trans_id)) != (std::int16_t)trans_id)
             {
                 m_last_errmsg = NORMAL_ERROR_MSG("transid not match");
@@ -434,7 +434,7 @@ private:
 
             answers = ntohs(header->answer_rrs);
 
-            index_inner += sizeof(DnsHeader); //authority rrs,additioanl rrs
+            index_inner += sizeof(DnsHeader); //authority rrs, additional rrs
 
             ret = true;
         FUNCTION_END;
@@ -502,9 +502,9 @@ private:
     }
 
 
-    bool check_index(int index, const std::string &respones)
+    bool check_index(int index, const std::string &str_response)
     {
-        if (index < 0 || (index >= 0 && index >= respones.size()))
+        if (index < 0 || (index >= 0 && index >= str_response.size()))
         {
             return false;
         }
