@@ -9,7 +9,6 @@
 
 #include "../socket/simpleudpclient.h"
 #include "../toolbox/timeutils.h"
-#include "../toolbox/miscs.h"
 #include "../toolbox/string_x.h"
 #include "errorhunter.h"
 
@@ -504,9 +503,7 @@ private:
 
     bool check_index(int index, const std::string &respones)
     {
-        //如果index溢出，index将变为一个负数，但是respones.size()返回的是一个size_t（unsigned int），比较会隐式转换
-        //将index这个int提升为unsigned int, 这时会是一个巨大的数。从而可能带来意外的结果。这里不判断index>=0，结果也是正确的。
-        if (index >= 0 && index >= respones.size())
+        if (index < 0 || (index >= 0 && index >= respones.size()))
         {
             return false;
         }
