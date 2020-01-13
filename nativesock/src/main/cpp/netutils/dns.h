@@ -10,6 +10,7 @@
 #include "../socket/simpleudpclient.h"
 #include "../toolbox/timeutils.h"
 #include "../toolbox/string_x.h"
+#include "../toolbox/miscs.h"
 #include "errorhunter.h"
 
 #pragma pack(1)
