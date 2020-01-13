@@ -167,7 +167,7 @@ private:
     }
 //////////////////////////////////////////////////////////////////////////////////////////////
 
-    ///analyze respones
+    ///analyze response
     bool analyze(const std::string &str_response, std::vector<std::string> &str_ips)
     {
         bool ret = false;
@@ -451,10 +451,10 @@ private:
         bool ret = false;
         FUNCTION_BEGIN ;
             //x0000000
-            int respones_type = (buff[0] & 0x80) >> 7; //respones type: 1,message is a response 0,message is a request
-            if (respones_type != 1)
+            int response_type = (buff[0] & 0x80) >> 7; //response type: 1,message is a response 0,message is a request
+            if (response_type != 1)
             {
-                m_last_errmsg = NORMAL_ERROR_MSG("flag is not a respones");
+                m_last_errmsg = NORMAL_ERROR_MSG("flag is not a response");
                 FUNCTION_LEAVE;
             }
             //0xxxx000
