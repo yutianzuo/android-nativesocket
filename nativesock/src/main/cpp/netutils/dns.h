@@ -78,7 +78,7 @@ public:
             ////
             int counter = 0;
             std::string response;
-            while (counter++ < 20)
+            while (counter++ < 50) //5000millis max
             {
                 if (SimpleUdpClient::operator>>(response))
                 {
@@ -219,7 +219,7 @@ private:
         else
         {
             int count = 0;
-            for (const auto& c : str_response)
+            for (auto c : str_response)
             {
                 ++count;
                 if (c == 0)
