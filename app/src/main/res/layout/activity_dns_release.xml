@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="utf-8"?>
+<RelativeLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    >
+
+    <EditText
+        android:id="@+id/host_input"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_below="@+id/dns_input"
+        android:layout_marginTop="10dp"
+        android:hint="input host:baidu.com"
+        android:textSize="32dp"
+        />
+
+    <Button
+        android:id="@+id/btn_confirm"
+        android:layout_width="match_parent"
+        android:layout_height="42dp"
+        android:layout_below="@+id/host_input"
+        android:layout_marginTop="10dp"
+        android:text="API优先查询"/>
+
+    <Button
+        android:id="@+id/btn_confirm_public"
+        android:layout_width="match_parent"
+        android:layout_height="42dp"
+        android:layout_below="@+id/btn_confirm"
+        android:layout_marginTop="10dp"
+        android:text="公共DNS优先查询"/>
+
+    <ListView
+        android:id="@+id/list"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:layout_below="@+id/btn_confirm_public"/>
+
+</RelativeLayout>

@@ -10,6 +10,7 @@ import android.widget.Button;
 public class MainActivity extends AppCompatActivity implements View.OnClickListener {
 
     Button mButtonDns;
+    Button mButtonDnsRelease;
     Button mButtonNetChoose;
     Button mButtonP2p;
 
@@ -18,6 +19,7 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
         mButtonDns = findViewById(R.id.btn_dns);
+        mButtonDnsRelease = findViewById(R.id.btn_dns_release);
         mButtonNetChoose = findViewById(R.id.btn_netchoose);
         mButtonP2p = findViewById(R.id.btn_p2p);
 
@@ -25,6 +27,7 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
         mButtonDns.setOnClickListener(this);
         mButtonNetChoose.setOnClickListener(this);
         mButtonP2p.setOnClickListener(this);
+        mButtonDnsRelease.setOnClickListener(this);
 
     }
 
@@ -40,7 +43,15 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
             case R.id.btn_p2p:
                 P2P();
                 break;
+            case R.id.btn_dns_release:
+                dnsRelease();
+                break;
         }
+    }
+
+    private void dnsRelease() {
+        Intent intent = new Intent(MainActivity.this, DnsReleaseActivity.class);
+        this.startActivity(intent);
     }
 
     private void P2P() {

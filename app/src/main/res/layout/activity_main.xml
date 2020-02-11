@@ -13,10 +13,18 @@
         android:text="Dns查询"/>
 
     <Button
-        android:id="@+id/btn_netchoose"
+        android:id="@+id/btn_dns_release"
         android:layout_width="match_parent"
         android:layout_height="60dp"
         android:layout_below="@+id/btn_dns"
+        android:layout_marginTop="20dp"
+        android:text="正式DNS查询API"/>
+
+    <Button
+        android:id="@+id/btn_netchoose"
+        android:layout_width="match_parent"
+        android:layout_height="60dp"
+        android:layout_below="@+id/btn_dns_release"
         android:layout_marginTop="20dp"
         android:text="Android-Drop"/>
 

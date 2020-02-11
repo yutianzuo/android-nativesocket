@@ -51,8 +51,74 @@ public:
 
     ~DNSQuery() override = default;
 
+    ///by defualt, first invoke get_ip_by_api use system default dns server
+    ///if got nothing, then invoke get_ip_by_host search ip by a specific dns server
+    ///if api_first == false, then reverse invoke
+    bool combine_search_ip_by_host(const std::string &str_host_query, std::vector<std::string> &ips,
+            bool api_first = true,  const std::string& str_dns_ip = "119.29.29.29", int retry_times = 50)
+    {
+        bool ret = false;
+        FUNCTION_BEGIN;
+        if (api_first)
+        {
+            ret = get_ip_by_api(str_host_query, ips);
+            if (!ips.empty())
+            {
+                FUNCTION_LEAVE;
+            }
+            ret = get_ip_by_host(str_dns_ip, str_host_query, ips, retry_times);
+        }
+        else
+        {
+            ret = get_ip_by_host(str_dns_ip, str_host_query, ips, retry_times);
+            if (!ips.empty())
+            {
+                FUNCTION_LEAVE;
+            }
+            ret = get_ip_by_api(str_host_query, ips);
+        }
+        FUNCTION_END;
+        return ret;
+    }
+
+    ///get ip by default invoke getaddrinfo use default dnshost, block func
+    bool get_ip_by_api(const std::string &str_host_query, std::vector<std::string> &ips)
+    {
+        static const int len = 128;
+        bool ret = false;
+        FUNCTION_BEGIN;
+            addrinfo *answer, hint, *curr;
+            char ipstr[len] = {0};
+            memset(&hint, 0, sizeof(hint));
+            hint.ai_family = AF_INET; //ipv4 only by far
+            hint.ai_socktype = SOCK_STREAM;
+            hint.ai_flags = AI_CANONNAME;
+
+            int addr_result = getaddrinfo(str_host_query.c_str(), nullptr, &hint, &answer);
+            if (addr_result != 0)
+            {
+                FUNCTION_LEAVE;
+            }
+            for (curr = answer; curr != nullptr; curr = curr->ai_next)
+            {
+                memset(ipstr, 0, len);
+                inet_ntop(curr->ai_family, &(((struct sockaddr_in *) (curr->ai_addr))->sin_addr), ipstr, len);
+                stringxa tmp = stringxa(ipstr);
+                if (!tmp.empty())
+                {
+                    ips.emplace_back(std::move(tmp));
+                }
+            }
+            freeaddrinfo(answer);
+
+            ret = true;
+        FUNCTION_END;
+        return ret;
+    }
+
     ///query dns server, only A records; block func
-    bool get_ip_by_host(const std::string &str_dnsip, const std::string &str_host_query, std::vector<std::string> &ips)
+    bool get_ip_by_host(const std::string &str_dnsip, const std::string &str_host_query,
+            std::vector<std::string> &ips, int times = 50/*retry times, per time 100 millis, default is 50 * 100millis*/)
     {
         bool ret = false;
         FUNCTION_BEGIN ;
@@ -78,7 +144,7 @@ public:
             ////
             int counter = 0;
             std::string response;
-            while (counter++ < 50) //5000millis max
+            while (counter++ < times) //5000millis max
             {
                 if (SimpleUdpClient::operator>>(response))
                 {

@@ -196,3 +196,87 @@ void Java_com_github_yutianzuo_nativesock_JniDef_quitListeningOrRecvingFile(JNIE
     }
 
 }
+
+inline
+void get_vector(std::vector<std::string>& ips, JNIEnv *env, jobject list_ips) {
+    jclass cls_list = env->GetObjectClass(list_ips);
+    if (cls_list) {
+        jmethodID arraylist_get = env->GetMethodID(cls_list, "get",
+                                                       "(I)Ljava/lang/Object;");
+        jmethodID arraylist_size = env->GetMethodID(cls_list, "size", "()I");
+        if (arraylist_get && arraylist_size) {
+            jint size = env->CallIntMethod(list_ips, arraylist_size);
+            for (int i = 0; i < size; ++i) {
+                jstring jstr_ip = (jstring) env->CallObjectMethod(list_ips,
+                                                                  arraylist_get, i);
+                if (jstr_ip) {
+                    const char *sz_ip = (char *) env->GetStringUTFChars(jstr_ip,
+                                                                        nullptr);
+                    if (sz_ip) {
+                        ips.emplace_back(sz_ip);
+                        env->ReleaseStringUTFChars(jstr_ip, sz_ip);
+                    }
+                }
+            }
+        }
+    }
+}
+
+
+extern "C"
+JNIEXPORT jstring JNICALL
+Java_com_github_yutianzuo_nativesock_JniDef_dnsBySpecifiedServers(JNIEnv *env, jclass clazz,
+                                                                  jobject ips,
+                                                                  jstring host_to_request,
+                                                                  jint retry_times) {
+    if (!ips || !host_to_request || retry_times <= 0) {
+        return nullptr;
+    }
+    const char *str_host = nullptr;
+    str_host = env->GetStringUTFChars(host_to_request, 0);
+    if (!str_host) {
+        return nullptr;
+    }
+    std::vector<std::string> vec_dns_servers;
+    get_vector(vec_dns_servers, env, ips);
+
+    jstring jstr_ret = nullptr;
+    for (auto& ip : vec_dns_servers) {
+        std::string ret;
+        DNSQuery query;
+        std::vector<std::string> hostips;
+        query.get_ip_by_host(ip, str_host, hostips, retry_times);
+
+        if (!hostips.empty()) {
+            jstr_ret = env->NewStringUTF(hostips.at(0).data());
+            break;
+        }
+    }
+    env->ReleaseStringUTFChars(host_to_request, str_host);
+    return jstr_ret;
+}
+
+
+extern "C"
+JNIEXPORT jstring JNICALL
+Java_com_github_yutianzuo_nativesock_JniDef_dnsByAPI(JNIEnv *env, jclass clazz,
+                                                     jstring host_to_request) {
+    if (!host_to_request) {
+        return nullptr;
+    }
+
+    const char *str_host = nullptr;
+    str_host = env->GetStringUTFChars(host_to_request, 0);
+    if (!str_host) {
+        return nullptr;
+    }
+
+    DNSQuery query;
+    std::vector<std::string> vec_ips;
+    query.get_ip_by_api(str_host, vec_ips);
+    env->ReleaseStringUTFChars(host_to_request, str_host);
+    if (!vec_ips.empty()) {
+        return env->NewStringUTF(vec_ips.at(0).data());
+    }
+    return nullptr;
+}
