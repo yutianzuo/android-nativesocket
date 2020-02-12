@@ -63,7 +63,8 @@ jstring Java_com_github_yutianzuo_nativesock_JniDef_dnsTest(JNIEnv *env, jclass 
 
     std::string ret;
     SocketBase *base = new DNSQuery();
-    std::vector<std::string> ips;
+    std::vector<int> ips;
+    std::vector<std::string> str_ips;
 //        static_cast<DNSQuery*>(base)->get_ip_by_host("8.8.8.8", "yutianzuo.com", ips);
     static_cast<DNSQuery *>(base)->get_ip_by_host(str_dns_server, str_host, ips);
     if (ips.empty()) {
@@ -71,6 +72,9 @@ jstring Java_com_github_yutianzuo_nativesock_JniDef_dnsTest(JNIEnv *env, jclass 
         ret = base->get_last_err_msg();
     } else {
         for (const auto &ip : ips) {
+            str_ips.emplace_back(NetHelper::safe_ipv4_to_string_addr(ip));
+        }
+        for (const auto &ip : str_ips) {
             ret += ip;
             ret += "#";
         }
@@ -222,9 +226,19 @@ void get_vector(std::vector<std::string>& ips, JNIEnv *env, jobject list_ips) {
     }
 }
 
+void int_for_java(std::vector<int>& ips) {
+    for (auto& ip : ips) {
+        ip = ((ip << 24) |
+                ((ip << 8) & 0xff0000) |
+                ((ip >> 24) & 0xff) |
+                ((ip >> 8) & 0xff00)
+        );
+    }
+}
+
 
 extern "C"
-JNIEXPORT jstring JNICALL
+JNIEXPORT jintArray JNICALL
 Java_com_github_yutianzuo_nativesock_JniDef_dnsBySpecifiedServers(JNIEnv *env, jclass clazz,
                                                                   jobject ips,
                                                                   jstring host_to_request,
@@ -240,25 +254,28 @@ Java_com_github_yutianzuo_nativesock_JniDef_dnsBySpecifiedServers(JNIEnv *env, j
     std::vector<std::string> vec_dns_servers;
     get_vector(vec_dns_servers, env, ips);
 
-    jstring jstr_ret = nullptr;
+    jintArray array = nullptr;
     for (auto& ip : vec_dns_servers) {
         std::string ret;
         DNSQuery query;
-        std::vector<std::string> hostips;
+        std::vector<int> hostips;
         query.get_ip_by_host(ip, str_host, hostips, retry_times);
 
         if (!hostips.empty()) {
-            jstr_ret = env->NewStringUTF(hostips.at(0).data());
+            int_for_java(hostips);
+            array = env->NewIntArray(hostips.size());
+            env->SetIntArrayRegion(array, 0, hostips.size(), &hostips[0]);
             break;
         }
     }
     env->ReleaseStringUTFChars(host_to_request, str_host);
-    return jstr_ret;
+
+    return array;
 }
 
 
 extern "C"
-JNIEXPORT jstring JNICALL
+JNIEXPORT jintArray JNICALL
 Java_com_github_yutianzuo_nativesock_JniDef_dnsByAPI(JNIEnv *env, jclass clazz,
                                                      jstring host_to_request) {
     if (!host_to_request) {
@@ -272,11 +289,14 @@ Java_com_github_yutianzuo_nativesock_JniDef_dnsByAPI(JNIEnv *env, jclass clazz,
     }
 
     DNSQuery query;
-    std::vector<std::string> vec_ips;
+    std::vector<int> vec_ips;
     query.get_ip_by_api(str_host, vec_ips);
     env->ReleaseStringUTFChars(host_to_request, str_host);
     if (!vec_ips.empty()) {
-        return env->NewStringUTF(vec_ips.at(0).data());
+        int_for_java(vec_ips);
+        jintArray array = env->NewIntArray(vec_ips.size());
+        env->SetIntArrayRegion(array, 0, vec_ips.size(), &vec_ips[0]);
+        return array;
     }
     return nullptr;
 }

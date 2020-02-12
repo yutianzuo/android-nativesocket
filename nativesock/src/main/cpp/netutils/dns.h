@@ -54,7 +54,7 @@ public:
     ///by defualt, first invoke get_ip_by_api use system default dns server
     ///if got nothing, then invoke get_ip_by_host search ip by a specific dns server
     ///if api_first == false, then reverse invoke
-    bool combine_search_ip_by_host(const std::string &str_host_query, std::vector<std::string> &ips,
+    bool combine_search_ip_by_host(const std::string &str_host_query, std::vector<int> &ips,
             bool api_first = true,  const std::string& str_dns_ip = "119.29.29.29", int retry_times = 50)
     {
         bool ret = false;
@@ -82,7 +82,7 @@ public:
     }
 
     ///get ip by default invoke getaddrinfo use default dnshost, block func
-    bool get_ip_by_api(const std::string &str_host_query, std::vector<std::string> &ips)
+    bool get_ip_by_api(const std::string &str_host_query, std::vector<int> &ips)
     {
         static const int len = 128;
         bool ret = false;
@@ -101,13 +101,14 @@ public:
             }
             for (curr = answer; curr != nullptr; curr = curr->ai_next)
             {
-                memset(ipstr, 0, len);
-                inet_ntop(curr->ai_family, &(((struct sockaddr_in *) (curr->ai_addr))->sin_addr), ipstr, len);
-                stringxa tmp = stringxa(ipstr);
-                if (!tmp.empty())
-                {
-                    ips.emplace_back(std::move(tmp));
-                }
+//                memset(ipstr, 0, len);
+//                inet_ntop(curr->ai_family, &(((struct sockaddr_in *) (curr->ai_addr))->sin_addr), ipstr, len);
+//                stringxa tmp = stringxa(ipstr);
+//                if (!tmp.empty())
+//                {
+//                    ips.emplace_back(std::move(tmp));
+//                }
+                ips.emplace_back(((struct sockaddr_in *) (curr->ai_addr))->sin_addr.s_addr);
             }
             freeaddrinfo(answer);
 
@@ -118,7 +119,7 @@ public:
 
     ///query dns server, only A records; block func
     bool get_ip_by_host(const std::string &str_dnsip, const std::string &str_host_query,
-            std::vector<std::string> &ips, int times = 50/*retry times, per time 100 millis, default is 50 * 100millis*/)
+            std::vector<int> &ips, int times = 50/*retry times, per time 100 millis, default is 50 * 100millis*/)
     {
         bool ret = false;
         FUNCTION_BEGIN ;
@@ -234,7 +235,7 @@ private:
 //////////////////////////////////////////////////////////////////////////////////////////////
 
     ///analyze response
-    bool analyze(const std::string &str_response, std::vector<std::string> &str_ips)
+    bool analyze(const std::string &str_response, std::vector<int> &str_ips)
     {
         bool ret = false;
         FUNCTION_BEGIN ;
@@ -297,7 +298,7 @@ private:
         }
     }
 
-    bool analyze_answers(int &index, const std::string &str_response, int answers, std::vector<std::string> &ips)
+    bool analyze_answers(int &index, const std::string &str_response, int answers, std::vector<int> &ips)
     {
         bool ret = false;
         int index_inner = index;
@@ -374,8 +375,8 @@ private:
                     continue;
                 }
                 int ip = *((int *) (&str_response[index_inner]));
-                std::string str_ip = NetHelper::ipv4_to_string_addr(ip);
-                ips.emplace_back(std::move(str_ip));
+//                std::string str_ip = NetHelper::ipv4_to_string_addr(ip);
+                ips.emplace_back(ip);
                 index_inner += 4;
             }
 

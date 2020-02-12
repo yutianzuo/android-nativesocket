@@ -10,11 +10,11 @@ public class JniDef {
     public static native String dnsTest(String dnsServer, String hostToRequests);
 
     /// 用公共dnsservers请求hostip
-    public static native String dnsBySpecifiedServers(List<String> ips, String hostToRequest,
+    public static native int[] dnsBySpecifiedServers(List<String> ips, String hostToRequest,
             int retryTimes);
 
     /// 用系统API请求hostip
-    public static native String dnsByAPI(String hostToRequest);
+    public static native int[] dnsByAPI(String hostToRequest);
 
     public static native String sendFile(String file, String ip);
 

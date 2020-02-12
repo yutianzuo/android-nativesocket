@@ -31,10 +31,19 @@
         android:layout_marginTop="10dp"
         android:text="公共DNS优先查询"/>
 
+
+    <Button
+        android:id="@+id/btn_test"
+        android:layout_width="match_parent"
+        android:layout_height="42dp"
+        android:layout_below="@+id/btn_confirm_public"
+        android:layout_marginTop="10dp"
+        android:text="OKHTTPTest"/>
+
     <ListView
         android:id="@+id/list"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:layout_below="@+id/btn_confirm_public"/>
+        android:layout_below="@+id/btn_test"/>
 
 </RelativeLayout>

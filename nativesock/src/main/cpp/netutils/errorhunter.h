@@ -94,7 +94,7 @@ public:
 
     static std::string safe_ipv6_to_string_addr(const in6_addr* addr)
     {
-        const int len = 64;
+        const int len = 128;
         char buff[len] = {0};
         return stringxa(::inet_ntop(AF_INET6, addr, buff, len));
     }

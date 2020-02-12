@@ -55,19 +55,19 @@ public class Dns {
         }
     }
 
-    public String getHostIPFirstByAPI(String host) {
-        String ip = JniDef.dnsByAPI(host);
-        if (TextUtils.isEmpty(ip)) {
-            ip = JniDef.dnsBySpecifiedServers(dnsServerIPs, host, retryTimes);
+    public int[] getHostIPFirstByAPI(String host) {
+        int[] ips = JniDef.dnsByAPI(host);
+        if (ips == null || ips.length == 0) {
+            ips = JniDef.dnsBySpecifiedServers(dnsServerIPs, host, retryTimes);
         }
-        return ip;
+        return ips;
     }
 
-    public String getHostIPFirstByPublicDNSServer(String host) {
-        String ip = JniDef.dnsBySpecifiedServers(dnsServerIPs, host, retryTimes);
-        if (TextUtils.isEmpty(ip)) {
-            ip = JniDef.dnsByAPI(host);
+    public int[] getHostIPFirstByPublicDNSServer(String host) {
+        int[] ips = JniDef.dnsBySpecifiedServers(dnsServerIPs, host, retryTimes);
+        if (ips == null || ips.length == 0) {
+            ips = JniDef.dnsByAPI(host);
         }
-        return ip;
+        return ips;
     }
 }
