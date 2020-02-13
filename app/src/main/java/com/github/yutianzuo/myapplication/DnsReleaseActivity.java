@@ -1,5 +1,7 @@
 package com.github.yutianzuo.myapplication;
 
+import com.google.common.net.InetAddresses;
+
 import android.annotation.SuppressLint;
 import android.os.Bundle;
 import android.support.annotation.Nullable;
@@ -19,11 +21,9 @@ import android.widget.Toast;
 import com.github.yutianzuo.nativesock.Dns;
 
 import java.io.IOException;
-import java.net.Inet4Address;
 import java.net.InetAddress;
 import java.net.UnknownHostException;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 
@@ -34,8 +34,6 @@ import okhttp3.Interceptor;
 import okhttp3.OkHttpClient;
 import okhttp3.Request;
 import okhttp3.Response;
-
-import com.google.common.net.InetAddresses;
 
 @SuppressLint("Registered")
 public class DnsReleaseActivity extends AppCompatActivity {
@@ -101,9 +99,11 @@ public class DnsReleaseActivity extends AppCompatActivity {
 
         final EditText etHost = findViewById(R.id.host_input);
 
-        ///custom parameters
+        ///custom parameters---optional
 //        Dns.getInstance().addServerIP("1.1.1.1");
 //        Dns.getInstance().setRetryTimesForPublicDNSServer(20);
+//        Dns.getInstance().setCacheTimeInSeconds(60);
+        ///custom parameters---optional
 
         btn.setOnClickListener(new OnClickListener() {
             @Override
@@ -228,7 +228,6 @@ class OkhttpClientUtils {
         builder.dns(new okhttp3.Dns() {
             @Override
             public List<InetAddress> lookup(String hostname) throws UnknownHostException {
-                ///生产环境中，这里应该考虑缓存以及合理的缓存生存期，加快ip地址返回。
                 try {
                     int[] ips = Dns.getInstance().getHostIPFirstByPublicDNSServer(hostname);
                     List<InetAddress> addrs = new ArrayList<>();
