@@ -283,14 +283,19 @@ private:
         {
             return 2;
         }
-        else
+        else //this may be a label sequence, or label sequence + pointer(pointer must be the end of domain name)
         {
             int count = 0;
             for (auto c : str_response)
             {
                 ++count;
-                if (c == 0)
+                if (c == 0) // a label sequence
                 {
+                    break;
+                }
+                else if (c & 0xc0) //end with a pointer
+                {
+                    ++count;
                     break;
                 }
             }
@@ -402,11 +407,12 @@ private:
             }
             else
             {
+                //if labels + pointer, then pointer must be the end of the domain name.
                 if (jump & 0xc0) //encounter a pointer
                 {
                     //just move on
                     ++index_inner;
-                    jump = 0;
+                    return index_inner;
                 }
                 else
                 {
@@ -447,7 +453,9 @@ private:
                 index_inner += 2;
             }
             else
-            { //name can be labels combines pointer, which is not handled
+            {
+                //name can be labels combines pointer, in which case pointer must be the end of domain name
+                //str_host must be ignored
                 index_inner = get_message_name(str_response, index_inner, str_host);
             }
 
