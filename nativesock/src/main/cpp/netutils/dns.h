@@ -279,25 +279,31 @@ private:
 
         //caution:
         //this equals 0xffff ffc0 & 0x0000 00c0 -> 0x000000c0 -> > 0 -> true
-        if (str_response[index] & 0xc0) //11xx xxxx-->represents a pointer
+        if ((str_response[index] & 0xc0) == 0xc0) //11xx xxxx-->represents a pointer
         {
             return 2;
         }
         else //this may be a label sequence, or label sequence + pointer(pointer must be the end of domain name)
         {
             int count = 0;
-            for (auto c : str_response)
+            auto c = str_response[index];
+            while (true)
             {
                 ++count;
                 if (c == 0) // a label sequence
                 {
                     break;
                 }
-                else if (c & 0xc0) //end with a pointer
+                else if ((c & 0xc0) == 0xc0) //end with a pointer
                 {
                     ++count;
                     break;
                 }
+                if (!check_index(index + 1, str_response))
+                {
+                    return INT_MAX;
+                }
+                c = str_response[++index];
             }
             return count;
         }
@@ -393,44 +399,47 @@ private:
 
     int get_message_name(const std::string &str_response, int index_inner, std::string &str_host)
     {
-        int jump = 0;
-        while (str_response[index_inner] != 0)
+        if ((str_response[index_inner] & 0xc0) == 0xc0) //just a pointer
         {
-            if (!check_index(index_inner, str_response))
+            int index_pointer = (((~0xc0 & 0xff) & str_response[index_inner]) << 8) |
+                                (str_response[index_inner + 1] & 0xff);
+            get_message_name(str_response, index_pointer, str_host);
+            index_inner += 2;
+        }
+        else //labels OR labels ends with a pointer
+        {
+            int jump = 0;
+            while (true)
             {
-                index_inner = str_response.size();
-                break;
-            }
-            if (jump == 0)
-            {
-                jump = (unsigned char) str_response[index_inner++];
-            }
-            else
-            {
-                //if labels + pointer, then pointer must be the end of the domain name.
-                if (jump & 0xc0) //encounter a pointer
+                if (!check_index(index_inner, str_response))
                 {
-                    //just move on
+                    index_inner = str_response.size();
+                    break;
+                }
+                jump = str_response[index_inner++];
+                if ((jump & 0xc0) == 0xc0)
+                {
+                    int index_pointer = (((~0xc0 & 0xff) & jump) << 8) |
+                                        (str_response[index_inner] & 0xff);
+                    get_message_name(str_response, index_pointer, str_host);
                     ++index_inner;
-                    return index_inner;
+                    break;
                 }
                 else
                 {
-                    if (index_inner + jump <= str_response.size())
+                    if (jump == 0 )
                     {
+                        break;
+                    }
+                    else if (index_inner + jump <= str_response.size())
+                    {
+                        str_host.empty() ? "" : str_host.append(".");
                         str_host.append(&str_response[index_inner], jump);
-                        str_host.append(".");
                     }
                     index_inner += jump;
-                    jump = 0;
                 }
             }
         }
-        if (str_host.size())
-        {
-            str_host.erase(str_host.size() - 1);
-        }
-        ++index_inner; //jump '\0'
         return index_inner;
     }
 
@@ -445,19 +454,7 @@ private:
                 FUNCTION_LEAVE;
             }
 
-            if (str_response[index_inner] & 0xc0) //name is a pointer
-            {
-                int index_pointer = (((~0xc0 & 0xff) & str_response[index_inner]) << 8) |
-                        (str_response[index_inner + 1] & 0xff);
-                get_message_name(str_response, index_pointer, str_host);
-                index_inner += 2;
-            }
-            else
-            {
-                //name can be labels combines pointer, in which case pointer must be the end of domain name
-                //str_host must be ignored
-                index_inner = get_message_name(str_response, index_inner, str_host);
-            }
+            index_inner = get_message_name(str_response, index_inner, str_host);
 
             if (!check_index(index_inner + 4, str_response))
             {
@@ -585,6 +582,65 @@ private:
         }
         return true;
     }
+
+    //////////////////////////////////////////////////////////////////////////////////////////////////////////////
+public:
+    void run_test_case()
+    {
+        int index1 = 0;
+        int index2 = 12;
+        int index3 = 18;
+        std::string data = generate_test_data();
+
+        int result = calc_message_name_size(data, index1);
+        std::cout << "size1:" << result << std::endl;
+        result = calc_message_name_size(data, index2);
+        std::cout << "size2:" << result << std::endl;
+        result = calc_message_name_size(data, index3);
+        std::cout << "size3:" << result << std::endl;
+
+        std::string str_host;
+        result = get_message_name(data, index1, str_host);
+        std::cout << "name1:" << str_host << " index:" << result << std::endl;
+        str_host.clear();
+        result = get_message_name(data, index2, str_host);
+        std::cout << "name2:" << str_host << " index:" << result << std::endl;
+        str_host.clear();
+        result = get_message_name(data, index3, str_host);
+        std::cout << "name3:" << str_host << " index:" << result << std::endl;
+    }
+
+private:
+    std::string generate_test_data()
+    {
+        ///3 type compression data
+        std::string data;
+        //F.ISI.APAR 1st, no compression, labels
+        data.push_back(1); //offset 0
+        data.push_back('F');
+        data.push_back(3);
+        data.push_back('I');
+        data.push_back('S');
+        data.push_back('I');
+        data.push_back(4);//offset 6
+        data.push_back('A');
+        data.push_back('P');
+        data.push_back('A');
+        data.push_back('R');
+        data.push_back(0);
+        //FOO.F.ISI.APAR, lebels with labels(in which case, pointer MUST be the end of domain name)
+        data.push_back(3); //ofsset 12
+        data.push_back('F');
+        data.push_back('O');
+        data.push_back('O');
+        data.push_back(0xc0); //pointer-> offset 0
+        data.push_back(0);
+        //APAR, only pointer
+        data.push_back(0xc0); //offset 18, pointer->offset 6
+        data.push_back(6);
+        return data;
+    }
+
 };
 
 #endif //SIMPLESOCKET_DNS_H
