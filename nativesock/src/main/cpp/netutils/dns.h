@@ -168,6 +168,7 @@ public:
 
 private:
     int trans_id = 0;
+    std::vector<int> ipv4s;
 
     ///construct simple dns query request
     std::string dns_query(std::string const &str_host)
@@ -241,8 +242,10 @@ private:
         FUNCTION_BEGIN ;
             int index = 0;
             int answers = 0;
+            int authority_rrs = 0;
+            int add_rrs = 0;
             ///header
-            if (!analyze_header(index, str_response, answers))
+            if (!analyze_header(index, str_response, answers, authority_rrs, add_rrs))
             {
                 FUNCTION_LEAVE;
             }
@@ -258,12 +261,26 @@ private:
             ///queries end
 
             ///answers
-            if (!analyze_answers(index, str_response, answers, str_ips))
+            if (answers > 0)
             {
-                m_last_errmsg = NORMAL_ERROR_MSG("analyze_answers failed");
-                FUNCTION_LEAVE;
+                if (!analyze_rrs(index, str_response, answers))
+                {
+                    m_last_errmsg = NORMAL_ERROR_MSG("analyze_answers failed");
+                    FUNCTION_LEAVE;
+                }
+                str_ips.swap(ipv4s);
             }
             ///answers end
+
+//            if (authority_rrs > 0)
+//            {
+//                analyze_rrs(index, str_response, authority_rrs);
+//            }
+//
+//            if (add_rrs > 0)
+//            {
+//                analyze_rrs(index, str_response, add_rrs);
+//            }
 
             ret = true;
         FUNCTION_END;
@@ -309,7 +326,7 @@ private:
         }
     }
 
-    bool analyze_answers(int &index, const std::string &str_response, int answers, std::vector<int> &ips)
+    bool analyze_rrs(int &index, const std::string &str_response, int answers)
     {
         bool ret = false;
         int index_inner = index;
@@ -376,21 +393,70 @@ private:
 
                 std::uint16_t len = ntohs(* ((std::int16_t*) &str_response[index_inner]));//length
                 index_inner += 2;
-                if (type != 1 || query_class != 1 || len != 4) // like cname
+                if (query_class != 1) //NOT IN type, no encounter yet
                 {
                     index_inner += len;
                     continue;
                 }
+
                 if (!check_index(index_inner, str_response))
                 {
                     continue;
                 }
-                int ip = *((int *) (&str_response[index_inner]));
-//                std::string str_ip = NetHelper::ipv4_to_string_addr(ip);
-                ips.emplace_back(ip);
-                index_inner += 4;
-            }
 
+                if (type == 1) //A-> ipv4 addr
+                {
+                    if (len != 4)
+                    {
+                        index_inner += len;
+                        continue;
+                    }
+                    int ip = *((int *) (&str_response[index_inner]));
+                    ipv4s.emplace_back(ip);
+                }
+                else if (type == 2) //Authoritative Name Server
+                {
+                    std::string str_host_name;
+                    int result = get_message_name(str_response, index_inner, str_host_name);
+                    std::cout<< "host name is:" << str_host_name << std::endl;
+                    if (result - index_inner != len)
+                    {
+                        std::cout<< "host name data len error" << std::endl;
+                    }
+                    else
+                    {
+                        std::cout<< "host name data len right" << std::endl;
+                    }
+                }
+                else if (type == 5) //CNAME
+                {
+                    std::string str_cname;
+                    int result = get_message_name(str_response, index_inner, str_cname);
+                    std::cout<< "cname is:" << str_cname << std::endl;
+                    if (result - index_inner != len)
+                    {
+                        std::cout<< "cname data len error" << std::endl;
+                    }
+                    else
+                    {
+                        std::cout<< "cname data len right" << std::endl;
+                    }
+                }
+                else if (type == 28) //AAAA->ipv6
+                {
+                    ///
+                }
+                else if (type == 6) //SOA start of a zone of authority
+                {
+                    ///
+                }
+                else //other type, just jump
+                {
+                    index_inner += len;
+                    continue;
+                }
+                index_inner += len;
+            }
             index = index_inner;
             ret = true;
         FUNCTION_END;
@@ -476,7 +542,7 @@ private:
         return ret;
     }
 
-    bool analyze_header(int &index, const std::string &str_response, int &answers)
+    bool analyze_header(int &index, const std::string &str_response, int &answers, int &authority, int& additional)
     {
         bool ret = false;
         int index_inner = index;
@@ -505,6 +571,8 @@ private:
             }
 
             answers = ntohs(header->answer_rrs);
+            authority = ntohs(header->authority_rrs);
+            additional = ntohs(header->additional_rrs);
 
             index_inner += sizeof(DnsHeader); //authority rrs, additional rrs
 
@@ -582,7 +650,6 @@ private:
         }
         return true;
     }
-
     //////////////////////////////////////////////////////////////////////////////////////////////////////////////
 public:
     void run_test_case()
@@ -590,7 +657,7 @@ public:
         int index1 = 0;
         int index2 = 12;
         int index3 = 18;
-        std::string data = generate_test_data();
+        std::string data = generate_name_test_data();
 
         int result = calc_message_name_size(data, index1);
         std::cout << "size1:" << result << std::endl;
@@ -608,10 +675,15 @@ public:
         str_host.clear();
         result = get_message_name(data, index3, str_host);
         std::cout << "name3:" << str_host << " index:" << result << std::endl;
+
+        data = generate_all_test_data();
+        std::vector<int> ips;
+        trans_id = 0x0662;
+        analyze(data, ips);
     }
 
 private:
-    std::string generate_test_data()
+    std::string generate_name_test_data()
     {
         ///3 type compression data
         std::string data;
@@ -640,6 +712,29 @@ private:
         data.push_back(6);
         return data;
     }
+
+    std::string generate_all_test_data()
+    {
+        std::string data("\x06\x62\x85\x80\x00\x01\x00\x01\x00\x03\x00\x09\x09\x79\x75\x74" \
+                            "\x69\x61\x6e\x7a\x75\x6f\x03\x63\x6f\x6d\x00\x00\x01\x00\x01\xc0" \
+                            "\x0c\x00\x01\x00\x01\x00\x02\xa3\x11\x00\x04\x41\x31\xdb\xe1\xc0" \
+                            "\x0c\x00\x02\x00\x01\x00\x02\xa3\x00\x00\x0d\x03\x6e\x73\x31\x06" \
+                            "\x64\x6e\x73\x6f\x77\x6c\xc0\x16\xc0\x0c\x00\x02\x00\x01\x00\x02" \
+                            "\xa3\x00\x00\x06\x03\x6e\x73\x32\xc0\x3f\xc0\x0c\x00\x02\x00\x01" \
+                            "\x00\x02\xa3\x00\x00\x06\x03\x6e\x73\x33\xc0\x3f\xc0\x3b\x00\x01" \
+                            "\x00\x01\x00\x00\xa8\xc0\x00\x04\x68\xcf\x8d\x8a\xc0\x3b\x00\x01" \
+                            "\x00\x01\x00\x00\x54\x60\x00\x04\xb9\x22\xd8\x9f\xc0\x3b\x00\x01" \
+                            "\x00\x01\x00\x00\x7e\x90\x00\x04\xc6\xfb\x54\x10\xc0\x54\x00\x01" \
+                            "\x00\x01\x00\x00\x54\x60\x00\x04\xa8\xeb\x4b\x34\xc0\x54\x00\x01" \
+                            "\x00\x01\x00\x00\x7e\x90\x00\x04\x2d\x20\xed\x80\xc0\x54\x00\x01" \
+                            "\x00\x01\x00\x00\xa8\xc0\x00\x04\x40\x20\x16\x64\xc0\x66\x00\x01" \
+                            "\x00\x01\x00\x00\x54\x60\x00\x04\xd1\x8d\x27\x96\xc0\x66\x00\x01" \
+                            "\x00\x01\x00\x00\xa8\xc0\x00\x04\x2d\x3f\x6a\x3f\xc0\x66\x00\x01" \
+                            "\x00\x01\x00\x00\x7e\x90\x00\x04\x2d\x3f\x05\xea", 252);
+
+        return data;
+    }
+
 
 };
 
