@@ -4,8 +4,8 @@ import com.google.common.net.InetAddresses;
 
 import android.annotation.SuppressLint;
 import android.os.Bundle;
-import android.support.annotation.Nullable;
-import android.support.v7.app.AppCompatActivity;
+import androidx.annotation.Nullable;
+import androidx.appcompat.app.AppCompatActivity;
 import android.text.TextUtils;
 import android.util.Log;
 import android.view.View;
@@ -153,6 +153,7 @@ public class DnsReleaseActivity extends AppCompatActivity {
                         });
                     }
                 }).start();
+//                btn_public.setVisibility(View.GONE);
             }
         });
 

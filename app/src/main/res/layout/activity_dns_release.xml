@@ -1,49 +1,63 @@
 <?xml version="1.0" encoding="utf-8"?>
-<RelativeLayout
-    xmlns:android="http://schemas.android.com/apk/res/android"
+<androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    >
+    android:background="@android:color/white">
+
 
     <EditText
         android:id="@+id/host_input"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_below="@+id/dns_input"
+        android:layout_width="0dp"
+        android:layout_height="64dp"
         android:layout_marginTop="10dp"
         android:hint="input host:baidu.com"
-        android:textSize="32dp"
-        />
+        android:inputType="text"
+        android:textSize="32sp"
+        app:layout_constraintLeft_toLeftOf="parent"
+        app:layout_constraintRight_toRightOf="parent"
+        app:layout_constraintTop_toTopOf="parent" />
 
     <Button
         android:id="@+id/btn_confirm"
-        android:layout_width="match_parent"
-        android:layout_height="42dp"
-        android:layout_below="@+id/host_input"
+        android:layout_width="0dp"
+        android:layout_height="60dp"
         android:layout_marginTop="10dp"
-        android:text="API优先查询"/>
+        android:text="API优先查询"
+        app:layout_constraintLeft_toLeftOf="parent"
+        app:layout_constraintRight_toRightOf="parent"
+        app:layout_constraintTop_toBottomOf="@+id/host_input" />
 
     <Button
         android:id="@+id/btn_confirm_public"
-        android:layout_width="match_parent"
-        android:layout_height="42dp"
-        android:layout_below="@+id/btn_confirm"
+        android:layout_width="0dp"
+        android:layout_height="60dp"
         android:layout_marginTop="10dp"
-        android:text="公共DNS优先查询"/>
+        android:text="公共DNS优先查询"
+        app:layout_constraintLeft_toLeftOf="parent"
+        app:layout_constraintRight_toRightOf="parent"
+        app:layout_constraintTop_toBottomOf="@+id/btn_confirm" />
 
 
     <Button
         android:id="@+id/btn_test"
-        android:layout_width="match_parent"
-        android:layout_height="42dp"
-        android:layout_below="@+id/btn_confirm_public"
+        android:layout_width="0dp"
+        android:layout_height="60dp"
         android:layout_marginTop="10dp"
-        android:text="OKHTTPTest"/>
+        app:layout_constraintLeft_toLeftOf="parent"
+        app:layout_constraintRight_toRightOf="parent"
+        android:text="OKHTTPTest"
+        app:layout_constraintTop_toBottomOf="@+id/btn_confirm_public" />
 
     <ListView
         android:id="@+id/list"
-        android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        android:layout_below="@+id/btn_test"/>
+        android:layout_width="0dp"
+        android:layout_height="0dp"
+        android:layout_marginTop="10dp"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintLeft_toLeftOf="parent"
+        app:layout_constraintRight_toRightOf="parent"
+        app:layout_constraintTop_toBottomOf="@+id/btn_test" />
 
-</RelativeLayout>
+</androidx.constraintlayout.widget.ConstraintLayout>
