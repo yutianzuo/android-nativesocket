@@ -200,7 +200,7 @@ callback) {
         }
         g_obj = env->NewGlobalRef(callback);
     }
-
+    LogUtils::init("/storage/emulated/0/recvfile/log.txt");
     const char *str_dir = nullptr;
     if (dir) {
         str_dir = env->GetStringUTFChars(dir, 0);

@@ -298,7 +298,8 @@ private:
                     int recv_size = s.receive(str_buff);
                     if (recv_size <= 0)
                     {
-                        LogUtils::get_instance()->log_multitype("recv piece data err, maybe close:", m_name);
+                        LogUtils::get_instance()->log_multitype("recv piece data err, maybe close:", m_name, " errerno",
+                                                                std::strerror(errno));
                         {
                             std::lock_guard<std::mutex> lock(m_mutex);
                             STLUtils::delete_from_container(m_socks_trans, [&s](const int& sock) -> bool
@@ -312,7 +313,8 @@ private:
                     if (str_buff.empty())
                     {
                         //上层数据校验失败
-                        LogUtils::get_instance()->log_multitype("data check failed in one piece:", m_name);
+                        LogUtils::get_instance()->log_multitype("data check failed in one piece:", m_name, " errerno",
+                                                                std::strerror(errno));
                         {
                             std::lock_guard<std::mutex> lock(m_mutex);
                             STLUtils::delete_from_container(m_socks_trans, [&s](const int& sock) -> bool
@@ -348,7 +350,8 @@ private:
                             });
                         }
                         s.close();
-                        LogUtils::get_instance()->log_multitype("sendback failed in one piece:", m_name);
+                        LogUtils::get_instance()->log_multitype("sendback failed in one piece:", m_name, " errerno",
+                                std::strerror(errno));
                         break;
                     }
 

@@ -464,6 +464,10 @@ public:
                     //check data completion
                     if (SimpleTransDataUtil::check_data(buff))
                     {
+                        if (!buff.empty())
+                        {
+                            status = buff.size();
+                        }
                         break;
                     }
                 }
