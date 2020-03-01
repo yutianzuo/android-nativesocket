@@ -38,9 +38,11 @@ public:
     void operator = (const TransRecvCtrl&) = delete;
     void operator = (TransRecvCtrl&&) = delete;
 
-    TransRecvCtrl(const std::shared_ptr<RecvMmap>& sp_filedata, const std::string& md5, std::uint64_t size,
-            const std::string& name) : m_sp_filedata(sp_filedata), m_md5(md5), m_size(size),
-            m_name(name), m_thread_count(0), m_start_update(false), m_can_clear(false)
+    template <typename T1, typename T2, typename T3>
+    TransRecvCtrl(T1&& sp_filedata, T2&& md5, std::uint64_t size, T3&& name) :
+    m_sp_filedata(std::forward<T1>(sp_filedata)), m_md5(std::forward<T2>(md5)),
+            m_size(size), m_name(std::forward<T3>(name)), m_thread_count(0),
+            m_start_update(false), m_can_clear(false)
     {
         init_threadfunc();
     }

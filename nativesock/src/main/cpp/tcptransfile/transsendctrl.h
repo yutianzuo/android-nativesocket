@@ -176,6 +176,7 @@ private:
             inputfile.seekg(m_piece_infos[index].begin_pos + (m_piece_infos[index].lenth - m_piece_infos[index].lenth_left));
             bool loop = true;
             std::string str_receive_buff;
+            str_receive_buff.resize(50);
             std::string str_send_data;
             while (loop)
             {

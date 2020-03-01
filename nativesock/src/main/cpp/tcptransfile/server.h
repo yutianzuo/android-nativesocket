@@ -137,8 +137,9 @@ public:
                                                                           str_ser_data.size());
                                     if (sock_acc.send(str_out))
                                     {
-                                        std::shared_ptr<TransRecvCtrl> sp_trans_recv_ctrl = std::make_shared<TransRecvCtrl>(
-                                                sp_filedata, md5, size, name);
+                                        std::shared_ptr<TransRecvCtrl> sp_trans_recv_ctrl =
+                                                std::make_shared<TransRecvCtrl>(std::move(sp_filedata), md5, size,
+                                                        std::move(name));
 #ifdef CONSOL_DEBUG
                                         sp_trans_recv_ctrl->set_info_callback([](
                                                 const char *persent, std::uint64_t bytes) -> void
