@@ -128,7 +128,7 @@ public class RecvActivity extends AppCompatActivity {
         this.runOnUiThread(new Runnable() {
             @Override
             public void run() {
-                mTvInfo.setText(info);
+                mTvInfo.setText(info + "----received ok!");
             }
         });
     }

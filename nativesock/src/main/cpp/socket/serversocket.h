@@ -237,7 +237,7 @@ public:
             }
 
 
-            if (vec_pollfd[0].revents & POLL_IN)
+            if (vec_pollfd[0].revents & POLLIN)
             {
                 int addr_length = sizeof(m_addr);
                 int socket_data = ::accept(m_sock, (sockaddr *) &m_addr, (socklen_t *) &addr_length);
@@ -250,7 +250,7 @@ public:
 
                 pollfd pfd_rwfd = {0};
                 pfd_rwfd.fd = socket_data;
-                pfd_rwfd.events = POLL_IN;
+                pfd_rwfd.events = POLLIN;
                 vec_pollfd.push_back(pfd_rwfd);
                 continue;
             }
@@ -258,7 +258,7 @@ public:
 
             for (auto item = vec_pollfd.begin(); item != vec_pollfd.end(); ++item)
             {
-                if ((item->revents & POLL_IN) && item->fd != m_sock)
+                if ((item->revents & POLLIN) && item->fd != m_sock)
                 {
                     ServerSocket s;
                     s.m_sock = item->fd;

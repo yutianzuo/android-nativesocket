@@ -16,6 +16,7 @@
 #include <iostream>
 #include "../toolbox/miscs.h"
 #include "../transdata/Crc32.h"
+#include "../toolbox/logutils.h"
 
 #include "datadef.h"
 
@@ -80,6 +81,7 @@ public:
                 FUNCTION_LEAVE;
             }
             std::uint64_t offset = 0;
+            bool for_fail = false;
             for (int i = 0; i < pieces; ++i)
             {
                 std::uint64_t len = (pages / pieces) * page_size;
@@ -90,12 +92,19 @@ public:
                 char* tmp = (char*)::mmap(nullptr, len, PROT_READ | PROT_WRITE, MAP_SHARED, fd_data, offset);
                 if (tmp == MAP_FAILED)
                 {
+                    for_fail = true;
                     std::cerr << "mmap failed" << std::endl;
+                    break;
                 }
                 m_piece_infos.emplace_back(offset, len, len, piece_id++, tmp);
                 offset += len;
             }
             ::close(fd_data);
+            if (for_fail)
+            {
+                b_ret = false;
+                FUNCTION_LEAVE;
+            }
             std::string str_out;
             serialize_data(str_out);
             write_info_file(str_out);
@@ -140,25 +149,35 @@ public:
                 b_ret = false;
                 FUNCTION_LEAVE;
             }
+            bool for_fail = false;
             for (int i = 0; i < m_piece_infos.size(); ++i)
             {
                 char* tmp = (char*)::mmap(nullptr, m_piece_infos[i].lenth, PROT_READ | PROT_WRITE, MAP_SHARED,
                         fd_data, m_piece_infos[i].begin_pos);
                 if (tmp == MAP_FAILED)
                 {
+                    for_fail = true;
                     std::cerr << "mmap failed" << std::endl;
+                    break;
                 }
                 else
                 {
+                    m_piece_infos[i].mapping_org = tmp;
                     tmp += (m_piece_infos[i].lenth - m_piece_infos[i].lenth_left);
                     m_piece_infos[i].mapping = tmp;
                 }
             }
             ::close(fd_data);
+            if (for_fail)
+            {
+                b_ret = false;
+                FUNCTION_LEAVE;
+            }
         }
         FUNCTION_END;
         return b_ret;
     }
+
     std::vector<picec_info>& get_pieces_infos()
     {
         return m_piece_infos;
@@ -168,12 +187,22 @@ public:
     {
         for (int i = 0; i < m_piece_infos.size(); ++i)
         {
-            if (m_piece_infos[i].mapping != MAP_FAILED)
+            if (m_piece_infos[i].mapping_org != (char*)MAP_FAILED)
             {
-                ::munmap(m_piece_infos[i].mapping - (m_piece_infos[i].lenth - m_piece_infos[i].lenth_left),
-                        m_piece_infos[i].lenth);
+                LogUtils::get_instance()->log_multitype(m_name, "munmap index:", i);
+                ::munmap(m_piece_infos[i].mapping_org, m_piece_infos[i].lenth);
+            }
+            else
+            {
+                LogUtils::get_instance()->log_multitype(m_name, "munmap MAP_FAILED:", i);
             }
         }
+        m_piece_infos.clear();
+    }
+
+    bool is_uninit()
+    {
+        return m_piece_infos.empty();
     }
 
     void write_info_file(const std::string& str_out)
@@ -201,6 +230,9 @@ public:
         tmp32 = m_piece_infos.size();
         PUT_LE_32(tmp32, pbuff); //blocks
         pbuff += 4;
+
+        std::unique_lock<std::mutex> lock(m_mutex, std::defer_lock);
+        lock.lock();
         for (int i = 0; i < m_piece_infos.size(); ++i)
         {
             tmp32 = m_piece_infos[i].sid;
@@ -219,6 +251,7 @@ public:
             PUT_LE_64(tmp64, pbuff);
             pbuff += 8;
         }
+        lock.unlock();
 
         tmp32 = crc32_bitwise(&str_ser_data[4], str_ser_data.size() - 4);
         pbuff = &str_ser_data[0];
@@ -239,14 +272,17 @@ public:
 
     void status(std::string& str_progress, bool& done, std::uint64_t& left_total)
     {
-//        std::lock_guard<std::mutex> lock(m_mutex);
+        std::unique_lock<std::mutex> lock(m_mutex, std::defer_lock);
+        lock.lock();
         std::uint64_t total = 0;
         std::uint64_t left = 0;
-        for (auto it : m_piece_infos)
+        for (auto& it : m_piece_infos)
         {
             total += it.lenth;
             left += it.lenth_left;
         }
+        lock.unlock();
+
         done = (left == 0);
         double persent = (double)(total - left) / total;
         std::ostringstream output_persent;
@@ -293,7 +329,7 @@ private:
     std::string m_md5;
     std::string m_name;
     std::string m_info_name;
-    std::string m_filedir;
+    std::string m_filedir; //下载文件和info文件所在目录
     std::uint64_t m_size;
     std::uint64_t m_trunc_size;
     std::vector<picec_info> m_piece_infos;

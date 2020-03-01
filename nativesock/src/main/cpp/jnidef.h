@@ -19,7 +19,7 @@ Java_com_github_yutianzuo_nativesock_JniDef_dnsTest(JNIEnv *, jclass, jstring, j
 JNIEXPORT
 jstring
 JNICALL
-Java_com_github_yutianzuo_nativesock_JniDef_sendFile(JNIEnv *, jclass, jstring, jstring);
+Java_com_github_yutianzuo_nativesock_JniDef_sendFile(JNIEnv *, jclass, jstring, jstring, jobject jobj);
 
 JNIEXPORT
 void
@@ -38,6 +38,9 @@ void
 JNICALL
 Java_com_github_yutianzuo_nativesock_JniDef_quitListeningOrRecvingFile(JNIEnv *env, jclass jobj);
 
+
+JNIEXPORT void JNICALL
+Java_com_github_yutianzuo_nativesock_JniDef_sendFileDone(JNIEnv *env, jclass clazz);
 
 #ifdef __cplusplus
 };

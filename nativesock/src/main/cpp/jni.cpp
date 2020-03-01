@@ -8,6 +8,7 @@
 #include "./netutils/dns.h"
 
 
+#include "tcptransfile/server.h"
 #include "tcptransfile/transrecvctrl.h"
 #include "tcptransfile/transsendctrl.h"
 
@@ -91,10 +92,21 @@ jstring Java_com_github_yutianzuo_nativesock_JniDef_dnsTest(JNIEnv *env, jclass 
     return env->NewStringUTF(ret.data());
 }
 
+jobject g_obj = nullptr;
+jobject g_obj_send = nullptr;
+FileRecvServer* g_recv = nullptr;
 
 jstring Java_com_github_yutianzuo_nativesock_JniDef_sendFile(JNIEnv *env, jclass jobj,
-                                                             jstring file, jstring ip) {
+                                                             jstring file, jstring ip, jobject
+                                                             callbackObj) {
+    if (callbackObj) {
+        if (g_obj_send) {
+            env->DeleteGlobalRef(g_obj_send);
+        }
+        g_obj_send = env->NewGlobalRef(callbackObj);
+    }
 
+    LogUtils::init("/storage/emulated/0/recvfile/log.txt");
 
     const char *str_file = nullptr;
     const char *str_ip = nullptr;
@@ -115,15 +127,54 @@ jstring Java_com_github_yutianzuo_nativesock_JniDef_sendFile(JNIEnv *env, jclass
         stringxa str_ipx(str_ip);
         SendCtrl sendctrl;
 
-        if (str_filex.empty() || str_ipx.empty()) {
+        if (str_filex.empty()) {
             str_ret = "wrong params";
             FUNCTION_LEAVE;
         }
+
+        if (str_ipx.empty())
+        {
+            DNSQuery dns;
+            std::vector<int> vec_ips;
+            dns.get_ip_by_api("cn.yutianzuo.com", vec_ips);
+            if (!vec_ips.empty())
+            {
+                str_ipx = NetHelper::safe_ipv4_to_string_addr(vec_ips[0]);
+            }
+        }
+
         if (!sendctrl.init(str_file)) {
             str_ret = "file wrong, file exsist?";
             FUNCTION_LEAVE;
         }
-        if (!sendctrl.send_file(str_ip, TransRecvCtrl::LISTENING_PORT)) {
+        auto func = [](std::uint64_t send, std::uint64_t toll) -> void
+        {
+            if (toll != 0)
+            {
+                double persent = (double) (send) / toll;
+                std::ostringstream output_persent;
+                output_persent.precision(2);
+                output_persent << std::fixed << "send progress:" << persent * 100 << "%";
+
+
+                JNIEnvPtr jnienv_holder;
+                if (g_obj_send) {
+                    jclass clazz = jnienv_holder->GetObjectClass(g_obj_send);
+                    jmethodID method = jnienv_holder->GetMethodID(clazz, "callBack",
+                                                                  "(Ljava/lang/String;)V");
+                    jstring jout = nullptr;
+                    try {
+                        jout = jnienv_holder->NewStringUTF(output_persent.str().data());
+                    } catch (...) {
+
+                    }
+                    jnienv_holder->CallVoidMethod(g_obj_send, method, jout);
+                }
+            }
+        };
+
+        sendctrl.set_callback(std::move(func));
+        if (!sendctrl.send_file(str_ipx, TransRecvCtrl::LISTENING_PORT)) {
             str_ret = "send file error";
             FUNCTION_LEAVE;
         }
@@ -140,8 +191,6 @@ jstring Java_com_github_yutianzuo_nativesock_JniDef_sendFile(JNIEnv *env, jclass
     return env->NewStringUTF(str_ret.data());
 }
 
-jobject g_obj = nullptr;
-TransRecvCtrl* g_recv = nullptr;
 
 void Java_com_github_yutianzuo_nativesock_JniDef_recvFile(JNIEnv *env, jclass jobj, jstring dir, jint pieces, jobject
 callback) {
@@ -157,27 +206,28 @@ callback) {
         str_dir = env->GetStringUTFChars(dir, 0);
     }
     /////
-    std::shared_ptr<TransRecvCtrl> sp_recv(new (std::nothrow) TransRecvCtrl(str_dir), [](TransRecvCtrl* recv)->void {
+    std::shared_ptr<FileRecvServer> sp_recv(new (std::nothrow) FileRecvServer(),
+            [](FileRecvServer* recv)->void {
         g_recv = nullptr;
         delete recv;
     });
     g_recv = sp_recv.get();
-    sp_recv->set_callback([](const char* out)->void {
+
+    sp_recv->set_callback([](const char* result)->void {
         JNIEnvPtr jnienv_holder;
         if (g_obj) {
             jclass clazz = jnienv_holder->GetObjectClass(g_obj);
             jmethodID method = jnienv_holder->GetMethodID(clazz, "callBack", "(Ljava/lang/String;)V");
             jstring jout = nullptr;
             try {
-                jout = jnienv_holder->NewStringUTF(out);
+                jout = jnienv_holder->NewStringUTF(result);
             } catch (...) {
 
             }
             jnienv_holder->CallVoidMethod(g_obj, method, jout);
         }
     });
-    sp_recv->init(pieces);
-    sp_recv->start_poll();
+    sp_recv->start_server(pieces, str_dir);
 
 
     if (str_dir) {
@@ -195,10 +245,16 @@ void Java_com_github_yutianzuo_nativesock_JniDef_recvDone(JNIEnv *env, jclass jo
 
 void Java_com_github_yutianzuo_nativesock_JniDef_quitListeningOrRecvingFile(JNIEnv *env, jclass jobj) {
     if (g_recv) {
-        g_recv->quit_listening();
+        g_recv->quit();
         g_recv = nullptr;
     }
+}
 
+void Java_com_github_yutianzuo_nativesock_JniDef_sendFileDone(JNIEnv *env, jclass clazz) {
+    if (g_obj_send) {
+        env->DeleteGlobalRef(g_obj_send);
+        g_obj_send = nullptr;
+    }
 }
 
 inline

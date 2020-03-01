@@ -16,7 +16,9 @@ public class JniDef {
     /// 用系统API请求hostip
     public static native int[] dnsByAPI(String hostToRequest);
 
-    public static native String sendFile(String file, String ip);
+    public static native String sendFile(String file, String ip, Object callbackObj);
+
+    public static native void sendFileDone();
 
     public static native void recvFile(String dir, int pieces, Object callback);
 
