@@ -138,7 +138,21 @@ public:
         if (!done && m_thread_count == 0 && ++timeout > 2)
         {
             m_can_clear = true;
+            log_file_status();
             STDCERR("trans imcomplete, will quit, please trans again");
+        }
+    }
+
+    void log_file_status()
+    {
+        stringxa str_log;
+        std::vector<picec_info> infos(m_sp_filedata->get_pieces_infos());
+        for (auto&it : infos)
+        {
+            str_log.format("piece idnex(%d)--len:%ld(%dMB), len_left:%ld(%dMB), begin_pos:%ld",
+                    it.sid, it.lenth, it.lenth / 1024 / 1024,  it.lenth_left, it.lenth_left / 1024 / 1024, it.begin_pos);
+            STDCOUT(str_log.c_str());
+            LogUtils::get_instance()->log(str_log);
         }
     }
 
@@ -187,6 +201,8 @@ private:
 
     std::vector<int> m_socks_trans;
 
+
+    std::string map_buff;
     ///run in a working thread
     bool update_file_piece_data(const char* buff, int len, picec_info* info)
     {
@@ -195,18 +211,66 @@ private:
         lock.lock();
         if (info->is_mapping_valid())
         {
+            if (len <= 0)
+            {
+                STDCERR("mark");
+                LogUtils::get_instance()->log_multitype("len <= 0");
+            }
+
             if (len > info->lenth_left)
             {
+                STDCERR("mark");
+                LogUtils::get_instance()->log_multitype("len > info->lenth_left");
                 len = info->lenth_left;
             }
-            memcpy(info->mapping, buff, len);
-            info->mapping += len;
-            info->lenth_left -= len;
+
+            map_buff.append(buff, len);
+
+            if (map_buff.size() >= SimpleTransDataUtil::MAX_ORI_DATA_LEN + 10)
+            {
+                std::string crc_str(map_buff, 0, SimpleTransDataUtil::MAX_ORI_DATA_LEN + 10);
+                if (!SimpleTransDataUtil::check_data(crc_str))
+                {
+                    STDCOUT("crc wrong, DATA error!!");
+                }
+                memcpy(info->mapping, crc_str.data(), crc_str.size());
+                map_buff.erase(0, SimpleTransDataUtil::MAX_ORI_DATA_LEN + 10);
+                info->mapping += crc_str.size();
+                info->lenth_left -= crc_str.size();
+
+                if (info->lenth_left == map_buff.size() - 10)
+                {
+                    crc_str.assign(map_buff, SimpleTransDataUtil::MAX_ORI_DATA_LEN + 10);
+                    if (!SimpleTransDataUtil::check_data(crc_str))
+                    {
+                        STDCOUT("crc wrong, DATA error(last)!!");
+                    }
+                    memcpy(info->mapping, crc_str.data(), crc_str.size());
+                    info->lenth_left = 0;
+                }
+
+            }
+
+            if (info->lenth_left != 0 && info->lenth_left == map_buff.size() - 10)
+            {
+                std::string crc_str(map_buff, 0, SimpleTransDataUtil::MAX_ORI_DATA_LEN + 10);
+                if (!SimpleTransDataUtil::check_data(crc_str))
+                {
+                    STDCOUT("crc wrong, DATA error(last2)!!");
+                }
+                memcpy(info->mapping, crc_str.data(), crc_str.size());
+                info->lenth_left = 0;
+            }
 
             if (info->lenth_left == 0)
             {
                 b_ret = true; //piece done
             }
+        }
+        else
+        {
+            STDCERR("mark");
+            LogUtils::get_instance()->log_multitype("mapping is not valid");
         }
         lock.unlock();
         return b_ret;
@@ -228,6 +292,7 @@ private:
             {
                 return;
             }
+            STDCOUT("filedata will uninit, this should be once");
             m_sp_filedata->uninit();
             lock.unlock();
             STDCOUT("all done");
@@ -250,10 +315,12 @@ private:
         long size = get_filesize(m_sp_filedata->get_full_file_path().c_str());
         if (size == 0)
         {
+            STDCERR("mark");
             size = m_size;
         }
         if (size != m_size)
         {
+            STDCERR("mark");
             ::truncate(m_sp_filedata->get_full_file_path().c_str(), m_size);
         }
         std::string md5 = CMD5Checksum::GetMD5(m_sp_filedata->get_full_file_path());
@@ -280,8 +347,8 @@ private:
         else
         {
             LogUtils::get_instance()->log_multitype("non-timer----check md5 failed delete all data:", m_name);
-            ::remove(m_sp_filedata->get_full_file_path().c_str());
-            ::remove(m_sp_filedata->get_full_infofile_path().c_str());
+//            ::remove(m_sp_filedata->get_full_file_path().c_str());
+//            ::remove(m_sp_filedata->get_full_infofile_path().c_str());
         }
         return b_ret;
     }

@@ -177,7 +177,7 @@ private:
                 piece_sender.close();
                 return;
             }
-            str_buff.resize(SimpleTransDataUtil::MAX_ORI_DATA_LEN + 2);
+            str_buff.resize(SimpleTransDataUtil::MAX_ORI_DATA_LEN);
             std::ifstream inputfile(m_file);
             if (!inputfile)
             {
@@ -191,15 +191,15 @@ private:
             std::string str_receive_buff;
             str_receive_buff.resize(50);
             std::string str_send_data;
-            std::uint16_t send_piece_counter = 0;
+//            std::uint16_t send_piece_counter = 0;
             while (loop)
             {
-                int read_len = m_piece_infos[index].lenth_left > str_buff.size() - 2 ? str_buff.size() - 2 : m_piece_infos[index].lenth_left;
-                if (read_len + 2 != str_buff.size())
+                int read_len = m_piece_infos[index].lenth_left > str_buff.size() ? str_buff.size() : m_piece_infos[index].lenth_left;
+                if (read_len != str_buff.size())
                 {
-                    str_buff.resize(read_len + 2);
+                    str_buff.resize(read_len);
                 }
-                if (!inputfile.read(&str_buff[2], read_len))
+                if (!inputfile.read(&str_buff[0], read_len))
                 {
                     //eof probably, if eof state will be set to (eof|fail)
                     //should not be here
@@ -219,12 +219,12 @@ private:
 
 
 #ifdef NO_CHECK_FILE_DATA
-                str_send_data.assign(str_buff.data(), str_buff.size());
+//                str_send_data.assign(str_buff.data(), str_buff.size());
+                SimpleTransDataUtil::build_trans_data(str_send_data, str_buff.data(), str_buff.size());
 #else
                 SimpleTransDataUtil::build_trans_data(str_send_data, str_buff.data(), str_buff.size());
 #endif
 
-                memcpy(&str_send_data[0], &send_piece_counter, 2);
 
 
                 if (!(piece_sender << str_send_data))
@@ -235,8 +235,6 @@ private:
                     piece_sender.close();
                     break;
                 }
-                LogUtils::get_instance()->log_multitype("piece num:", send_piece_counter);
-                ++send_piece_counter;
 
                 {
                     std::lock_guard<std::mutex> lock(m_mutex);
