@@ -312,6 +312,7 @@ private:
                         s.close();
                         break;
                     }
+#ifndef NO_CHECK_FILE_DATA
                     if (str_buff.empty())
                     {
                         //上层数据校验失败
@@ -327,6 +328,7 @@ private:
                         s.close();
                         break;
                     }
+#endif
                     if (this->update_file_piece_data(str_buff.c_str(), recv_size, s.get_piece_info()))
                     {
                         //piece done
@@ -342,6 +344,8 @@ private:
                         this->one_piece_done();
                         break;
                     }
+
+#ifndef NO_CHECK_FILE_DATA
                     if (!s.send("continue"))
                     {
                         {
@@ -356,6 +360,7 @@ private:
                                 std::strerror(errno));
                         break;
                     }
+#endif
 
                 }
             }

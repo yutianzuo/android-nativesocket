@@ -195,7 +195,10 @@ public:
                             std::string str_sendback;
                             SimpleTransDataUtil::build_trans_data(str_sendback,
                                                                   vec_info[2].c_str(), vec_info[2].size());
-//                            sock_acc.set_check_data(false);
+#ifdef NO_CHECK_FILE_DATA
+                            sock_acc.set_check_data(false);
+#endif
+
                             if (sock_acc.send(str_sendback))
                             {
                                 m_map_trans.find(md5)->second->add_socket(std::move(sock_acc));

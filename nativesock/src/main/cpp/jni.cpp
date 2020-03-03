@@ -141,6 +141,7 @@ jstring Java_com_github_yutianzuo_nativesock_JniDef_sendFile(JNIEnv *env, jclass
             {
                 str_ipx = NetHelper::safe_ipv4_to_string_addr(vec_ips[0]);
             }
+            str_ipx = "172.18.135.34";
         }
 
         if (!sendctrl.init(str_file)) {

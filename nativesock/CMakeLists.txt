@@ -23,6 +23,7 @@ if (${CMAKE_BUILD_TYPE} MATCHES Debug)
 endif ()
 
 #add_definitions(-DENABLE_LOG)
+add_definitions(-DNO_CHECK_FILE_DATA)
 
 add_library( # Sets the name of the library.
         native_sock

@@ -44,6 +44,18 @@ public:
         return b_ret;
     }
 
+    void log_file_status()
+    {
+        stringxa str_log;
+        for (auto&it : m_piece_infos)
+        {
+            str_log.format("piece idnex(%d)--len:%ld(%dMB), len_left:%ld(%dMB), begin_pos:%ld",
+                           it.sid, it.lenth, it.lenth / 1024 / 1024,  it.lenth_left, it.lenth_left / 1024 / 1024, it.begin_pos);
+            STDCOUT(str_log.c_str());
+            LogUtils::get_instance()->log(str_log);
+        }
+    }
+
     bool send_file(const std::string& str_ip, int port)
     {
         bool b_ret = false;
@@ -79,6 +91,7 @@ public:
                 FUNCTION_LEAVE;
             }
             deserialize_data(str_piece_infos.c_str(), str_piece_infos.size(), m_piece_infos);
+            log_file_status();
             sender_neg.close();
             if (m_piece_infos.empty())
             {
@@ -164,7 +177,7 @@ private:
                 piece_sender.close();
                 return;
             }
-            str_buff.resize(SimpleTransDataUtil::MAX_ORI_DATA_LEN);
+            str_buff.resize(SimpleTransDataUtil::MAX_ORI_DATA_LEN + 2);
             std::ifstream inputfile(m_file);
             if (!inputfile)
             {
@@ -178,14 +191,15 @@ private:
             std::string str_receive_buff;
             str_receive_buff.resize(50);
             std::string str_send_data;
+            std::uint16_t send_piece_counter = 0;
             while (loop)
             {
-                int read_len = m_piece_infos[index].lenth_left > str_buff.size() ? str_buff.size() : m_piece_infos[index].lenth_left;
-                if (read_len != str_buff.size())
+                int read_len = m_piece_infos[index].lenth_left > str_buff.size() - 2 ? str_buff.size() - 2 : m_piece_infos[index].lenth_left;
+                if (read_len + 2 != str_buff.size())
                 {
-                    str_buff.resize(read_len);
+                    str_buff.resize(read_len + 2);
                 }
-                if (!inputfile.read(&str_buff[0], read_len))
+                if (!inputfile.read(&str_buff[2], read_len))
                 {
                     //eof probably, if eof state will be set to (eof|fail)
                     //should not be here
@@ -203,7 +217,15 @@ private:
                     break;
                 }
 
+
+#ifdef NO_CHECK_FILE_DATA
+                str_send_data.assign(str_buff.data(), str_buff.size());
+#else
                 SimpleTransDataUtil::build_trans_data(str_send_data, str_buff.data(), str_buff.size());
+#endif
+
+                memcpy(&str_send_data[0], &send_piece_counter, 2);
+
 
                 if (!(piece_sender << str_send_data))
                 {
@@ -213,6 +235,8 @@ private:
                     piece_sender.close();
                     break;
                 }
+                LogUtils::get_instance()->log_multitype("piece num:", send_piece_counter);
+                ++send_piece_counter;
 
                 {
                     std::lock_guard<std::mutex> lock(m_mutex);
@@ -228,6 +252,7 @@ private:
                     //before eof break while
                     break;
                 }
+#ifndef NO_CHECK_FILE_DATA
 
                 if (!(piece_sender >> str_receive_buff)) //wait for server check data to continue
                 {
@@ -237,6 +262,7 @@ private:
                     piece_sender.close();
                     break;
                 }
+#endif
             }
             inputfile.close();
             piece_sender.close();
