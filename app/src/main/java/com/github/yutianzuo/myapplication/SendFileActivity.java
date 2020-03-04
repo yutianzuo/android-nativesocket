@@ -188,13 +188,15 @@ public class SendFileActivity extends AppCompatActivity implements View.OnClickL
                     @Override
                     public void run() {
                         dlg.dismiss();
-                        mBtnSend.setEnabled(false);
+                        mBtnSend.setEnabled(true);
                         mBtnSend.setText(strRet);
                     }
                 });
 
             }
         }).start();
+
+        mBtnSend.setEnabled(false);
     }
 }
 
