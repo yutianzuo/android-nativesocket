@@ -71,6 +71,11 @@ public:
         t.detach();
     }
 
+    std::string get_progress_str()
+    {
+        return m_progress_str;
+    }
+
     bool can_clear()
     {
         return m_can_clear;
@@ -119,7 +124,7 @@ public:
 
         if (m_info_callback)
         {
-            m_info_callback(str_persent.data(),last_done_num - left_total);
+            m_progress_str = m_info_callback(str_persent.data(),last_done_num - left_total);
         }
         delta += (last_done_num - left_total);
         last_done_num = left_total;
@@ -168,7 +173,8 @@ public:
     }
 
 private:
-    std::function<void(const char*, std::uint64_t)> m_info_callback;
+    std::string m_progress_str;
+    std::function<std::string(const char*, std::uint64_t)> m_info_callback;
     std::uint64_t m_size;
     std::string m_md5;
     std::string m_name;
@@ -300,6 +306,7 @@ private:
                     int recv_size = s.receive(str_buff);
                     if (recv_size <= 0)
                     {
+                        STDCERR("recv_size <= 0");
                         LogUtils::get_instance()->log_multitype("recv piece data err, maybe close:", m_name, " errerno",
                                                                 std::strerror(errno));
                         {
@@ -314,6 +321,7 @@ private:
                     }
                     if (str_buff.empty())
                     {
+                        STDCERR("DATA EEROR!!");
                         //上层数据校验失败
                         LogUtils::get_instance()->log_multitype("data check failed in one piece:", m_name, " errerno",
                                                                 std::strerror(errno));
@@ -344,6 +352,7 @@ private:
                     }
                     if (!s.send("continue"))
                     {
+                        STDCERR("!s.send()");
                         {
                             std::lock_guard<std::mutex> lock(m_mutex);
                             STLUtils::delete_from_container(m_socks_trans, [&s](const int& sock) -> bool

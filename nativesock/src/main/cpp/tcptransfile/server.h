@@ -140,19 +140,29 @@ public:
                                         std::shared_ptr<TransRecvCtrl> sp_trans_recv_ctrl =
                                                 std::make_shared<TransRecvCtrl>(std::move(sp_filedata), md5, size,
                                                         std::move(name));
-#ifdef CONSOL_DEBUG
+//#ifdef CONSOL_DEBUG
+//                                        sp_trans_recv_ctrl->set_info_callback([](
+//                                                const char *persent, std::uint64_t bytes) -> void
+//                                          {
+//                                              std::ostringstream oss;
+//                                              oss << "\rprogress:" << persent
+//                                                  << " speed:"
+//                                                  << bytes / 1000 << "KB/s" << "      ";
+//                                              std::string strout = oss.str();
+//                                              std::cout << strout;
+//                                              fflush(stdout);
+//                                          });
+//#endif
                                         sp_trans_recv_ctrl->set_info_callback([](
-                                                const char *persent, std::uint64_t bytes) -> void
-                                          {
-                                              std::ostringstream oss;
-                                              oss << "\rprogress:" << persent
-                                                  << " speed:"
-                                                  << bytes / 1000 << "KB/s" << "      ";
-                                              std::string strout = oss.str();
-                                              std::cout << strout;
-                                              fflush(stdout);
-                                          });
-#endif
+                                                const char *persent, std::uint64_t bytes) -> std::string
+                                                                              {
+                                                                                  std::ostringstream oss;
+                                                                                  oss << "progress:" << persent
+                                                                                      << " speed:"
+                                                                                      << bytes /
+                                                                                      2000 << "KB/s";
+                                                                                  return oss.str();
+                                                                              });
                                         m_map_trans.insert(
                                                 std::pair<std::string, std::shared_ptr<TransRecvCtrl>>(
                                                         std::move(md5), std::move(sp_trans_recv_ctrl)));
@@ -257,6 +267,13 @@ private:
                 if (m_callback)
                 {
                     m_callback(kv.second->get_file_name().data());
+                }
+            }
+            else
+            {
+                if (m_callback)
+                {
+                    m_callback(kv.second->get_progress_str().data());
                 }
             }
             return ret;
