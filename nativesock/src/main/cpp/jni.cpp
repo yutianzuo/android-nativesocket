@@ -96,6 +96,32 @@ jobject g_obj = nullptr;
 jobject g_obj_send = nullptr;
 FileRecvServer* g_recv = nullptr;
 
+/**
+ * get ip string, when input is ip, return it; when input is host, get ip through dns server.
+ * @param ip_or_host
+ * @return
+ */
+static std::string get_ip_str_from_str(const std::string& ipv4_or_host)
+{
+    in_addr buff = {0};
+    if (::inet_aton(ipv4_or_host.data(), &buff) != 0) //is a ipv4 string
+    {
+        return ipv4_or_host;
+    }
+    DNSQuery dns;
+    std::vector<int> vec_ips;
+    dns.get_ip_by_api(ipv4_or_host, vec_ips);
+    if (!vec_ips.empty())
+    {
+        return NetHelper::safe_ipv4_to_string_addr(vec_ips[0]);
+    }
+    else
+    {
+        return "";
+    }
+}
+
+
 jstring Java_com_github_yutianzuo_nativesock_JniDef_sendFile(JNIEnv *env, jclass jobj,
                                                              jstring file, jstring ip, jobject
                                                              callbackObj) {
@@ -141,6 +167,10 @@ jstring Java_com_github_yutianzuo_nativesock_JniDef_sendFile(JNIEnv *env, jclass
             {
                 str_ipx = NetHelper::safe_ipv4_to_string_addr(vec_ips[0]);
             }
+        }
+        else
+        {
+            str_ipx = get_ip_str_from_str(str_ipx);
         }
 
         if (!sendctrl.init(str_file)) {
