@@ -18,7 +18,7 @@
         android:layout_height="50dp"
         android:layout_below="@+id/tv_filesend"
         android:layout_marginTop="20dp"
-        android:hint="输入目标机器ip:192.168.0.56"/>
+        android:hint="如果不输入ip地址，将上传到云端"/>
 
     <Button
         android:layout_marginTop="40dp"

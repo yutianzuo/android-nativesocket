@@ -7,17 +7,22 @@
 
 #include <thread>
 #include <vector>
+#include <memory>
 #include <functional>
-#include <stdio.h>
+#include <cstdio>
 #include <poll.h>
+#include <atomic>
+#include <mutex>
 
-
+#include "../toolbox/stlutils.h"
 #include "../toolbox/miscs.h"
 #include "../toolbox/string_x.h"
 #include "../toolbox/timeutils.h"
 #include "recvmmap.h"
 #include "transfiletcprecv.h"
 #include "../transdata/CBMD5.h"
+#include "../toolbox/logutils.h"
+
 /**
  * transfer file through tcp in multi-thread,
  * receiver actually is a server
@@ -28,122 +33,135 @@
 class TransRecvCtrl final
 {
 public:
-    TransRecvCtrl(const std::string& str_dir) : m_filedata(str_dir)
-    {}
+    TransRecvCtrl(const TransRecvCtrl&) = delete;
+    TransRecvCtrl(TransRecvCtrl&&) = delete;
+    void operator = (const TransRecvCtrl&) = delete;
+    void operator = (TransRecvCtrl&&) = delete;
+
+    template <typename T1, typename T2, typename T3>
+    TransRecvCtrl(T1&& sp_filedata, T2&& md5, std::uint64_t size, T3&& name) :
+    m_sp_filedata(std::forward<T1>(sp_filedata)), m_md5(std::forward<T2>(md5)),
+            m_size(size), m_name(std::forward<T3>(name)), m_thread_count(0),
+            m_start_update(false), m_can_clear(false)
+    {
+        init_threadfunc();
+    }
+
+    ~TransRecvCtrl()
+    {
+        STDCOUT("~TransRecvCtrl");
+        quit();
+        m_sp_filedata->uninit();
+    }
+
     enum
     {
         LISTENING_PORT = 5896,
-        MEMORY_BUFF_LEN = 2 * 1024 * 1024
     };
-    bool init(int pieces)
+
+    void add_socket(TransFileTcpRecv&& s)
     {
-        if (pieces <= 0 || pieces > 16)
+        ++m_thread_count;
+        m_start_update = true;
         {
-            pieces = RecvMmap::PIECES_DEFAULT;
+            std::lock_guard<std::mutex> lock(m_mutex);
+            m_socks_trans.push_back(s.get_socket());
         }
-        m_pieces = pieces;
-        m_size = 0;
-        m_thread_count = 0;
-        init_threadfunc();
-        return m_sock_listen.init(LISTENING_PORT);
+        std::thread t(m_threadfunc, std::move(s));
+        t.detach();
     }
 
-//    bool start()
-//    {
-//        bool b_ret = true;
-//        do
-//        {
-//            TransFileTcpRecv sock;
-//            b_ret = m_sock_listen.accept(sock); //sock maybe a full file negotiating socket; maybe a file piece data transfer socket
-//            if (b_ret)
-//            {
-//                ++m_thread_count;
-//                std::thread t(m_threadfunc, std::move(sock));
-//                t.detach();
-//            }
-//            else
-//            {
-//                if (errno == EINTR)
-//                {
-//                    b_ret = true;
-//                }
-//            }
-//        } while (b_ret);
-//    }
-
-    void start_poll()
+    std::string get_progress_str()
     {
-        std::vector<pollfd> vec_pollfd;
-        pollfd pfd_accept = {0};
-        pfd_accept.fd = m_sock_listen.get_socket();
-        pfd_accept.events = POLLIN;
-        vec_pollfd.push_back(pfd_accept);
+        return m_progress_str;
+    }
 
-        bool start_update = false;
-        while (true)
+    bool can_clear()
+    {
+        return m_can_clear;
+    }
+
+    std::string get_file_name()
+    {
+        return m_name;
+    }
+
+
+    void update_info()
+    {
+        if (!m_start_update)
         {
-            int nready = ::poll(&vec_pollfd[0], vec_pollfd.size(), 1000);
-            if (start_update)
-            {
-                start_update_info();
-            }
-            if (nready < 0)
-            {
-                if (errno == EINTR)
-                {
-                    //忽略此信号
-                    continue;
-                }
-                else
-                {
-                    break;
-                }
-            }
-            if (nready == 0) //timeout
-            {
-                if (!m_sock_listen.is_valid_socket())
-                {
-                    break;
-                }
-                continue;
-            }
+            return;
+        }
+        std::string str_persent;
+        bool done;
+        std::uint64_t left_total;
+        m_sp_filedata->status(str_persent, done, left_total);
+        if (done)
+        {
+            return;
+        }
 
-            //android中 close掉了listen的socket，poll一直返回1。
-            //并且返回的revents是32。
-            if (!(vec_pollfd[0].revents & POLLIN) && !m_sock_listen.is_valid_socket())
-            {
-                break;
-            }
+        if (last_time == 0)
+        {
+            last_time = TimeUtils::get_current_time();
+            last_done_num = left_total;
+            return;
+        }
 
-            if (vec_pollfd[0].revents & POLLIN)
+        if (last_done_num == left_total)
+        {
+            ++m_receive_timeout;
+            if (m_receive_timeout > 30) //over 1 minute no data, quit
             {
-                STDCOUT("trans thread create");
-                start_update = true;
-                TransFileTcpRecv sock;
-                bool b_ret = m_sock_listen.accept(sock);
-                if (b_ret)
-                {
-                    ++m_thread_count;
-                    m_socks_trans.push_back(sock.get_socket());
-                    std::thread t(m_threadfunc, std::move(sock));
-                    t.detach();
-                }
-                else
-                {
-                    STDCERR("poll-accept-error");
-                }
+                quit();
             }
         }
+        else
+        {
+            m_receive_timeout = 0;
+        }
+
+        if (m_info_callback)
+        {
+            m_progress_str = m_info_callback(str_persent.data(),last_done_num - left_total);
+        }
+        delta += (last_done_num - left_total);
+        last_done_num = left_total;
+        if (delta > 5 * 1024 * 1024 || (m_thread_count == 0 && !done))
+        {
+            delta = 0;
+            std::string str_ser_data;
+            m_sp_filedata->serialize_data(str_ser_data);
+            if (!m_sp_filedata->is_uninit())
+            {
+                m_sp_filedata->write_info_file(str_ser_data);
+            }
+        }
+        LogUtils::get_instance()->log_multitype("update_info(", m_name, ")", "done:", done, " m_thread_count:",
+                m_thread_count, " timeout:", timeout, " persent:", str_persent, " leftsize:", left_total);
+        if (!done && m_thread_count == 0 && ++timeout > 2)
+        {
+            m_can_clear = true;
+            STDCERR("trans imcomplete, will quit, please trans again");
+        }
     }
+
+    std::shared_ptr<RecvMmap>& get_filedata()
+    {
+        return m_sp_filedata;
+    }
+
 
     template <typename T>
-    void set_callback(T&& func)
+    void set_info_callback(T&& func)
     {
-        m_callback = func;
+        m_info_callback = std::forward<T>(func);
     }
 
-    void quit_listening()
+    void quit()
     {
+        std::lock_guard<std::mutex> lock(m_mutex);
         if (!m_socks_trans.empty())
         {
             for (auto sock : m_socks_trans)
@@ -152,35 +170,35 @@ public:
                 ::close(sock);
             }
         }
-        else
-        {
-            m_sock_listen.close();
-        }
     }
 
 private:
-    std::function<void(const char*)> m_callback;
-    int m_pieces;
+    std::string m_progress_str;
+    std::function<std::string(const char*, std::uint64_t)> m_info_callback;
     std::uint64_t m_size;
     std::string m_md5;
     std::string m_name;
     std::function<void(TransFileTcpRecv)> m_threadfunc;
-    RecvMmap m_filedata;
-    TransFileTcpRecv m_sock_listen;
+    std::shared_ptr<RecvMmap> m_sp_filedata;
     std::atomic_int m_thread_count;
+    std::mutex m_mutex;
+    int m_receive_timeout = 0;
 
     std::uint64_t last_done_num = 0;
     std::chrono::milliseconds::rep last_time = 0;
     std::uint64_t delta = 0;
     int timeout = 0;
+    bool m_start_update;
+    bool m_can_clear;
 
     std::vector<int> m_socks_trans;
 
+    ///run in a working thread
     bool update_file_piece_data(const char* buff, int len, picec_info* info)
     {
         bool b_ret = false;
-//        std::unique_lock<std::mutex> lock(m_filedata.get_mutex(), std::defer_lock);
-//        lock.lock();
+        std::unique_lock<std::mutex> lock(m_sp_filedata->get_mutex(), std::defer_lock);
+        lock.lock();
         if (info->is_mapping_valid())
         {
             if (len > info->lenth_left)
@@ -196,55 +214,28 @@ private:
                 b_ret = true; //piece done
             }
         }
-//        lock.unlock();
+        lock.unlock();
         return b_ret;
     }
 
-    void start_update_info()
-    {
-        std::string str_persent;
-        bool done;
-        std::uint64_t left_total;
-        this->m_filedata.status(str_persent, done, left_total);
-        if (last_time == 0)
-        {
-            last_time = TimeUtils::get_current_time();
-            last_done_num = left_total;
-            return;
-        }
-        std::ostringstream oss;
-        oss << "\rprogress:"<<str_persent<<" speed:"<<(last_done_num - left_total) / 1000 <<"KB/s"<<"      ";
-        std::string strout = oss.str();
-        if (m_callback)
-        {
-            m_callback(strout.data());
-        }
-        delta += (last_done_num - left_total);
-        last_done_num = left_total;
-        if (delta > 5 * 1024 * 1024 || (m_thread_count == 0 && !done))
-        {
-            delta = 0;
-            std::string str_ser_data;
-            m_filedata.serialize_data(str_ser_data);
-            m_filedata.write_info_file(str_ser_data);
-        }
-        if (!done && m_thread_count == 0 && ++timeout > 4)
-        {
-            STDCERR("trans imcomplete, will quit, please trans again");
-            m_sock_listen.close();
-        }
-    }
-
+    ///run in a working thread
     void one_piece_done()
     {
         STDCOUT("one piece done");
         std::string persent;
         std::uint64_t left_total;
         bool done;
-        m_filedata.status(persent, done, left_total);
+        m_sp_filedata->status(persent, done, left_total);
         if (done)
         {
-            m_filedata.uninit();
+            std::unique_lock<std::mutex> lock(m_mutex, std::defer_lock);
+            lock.lock();
+            if (m_sp_filedata->is_uninit())
+            {
+                return;
+            }
+            m_sp_filedata->uninit();
+            lock.unlock();
             STDCOUT("all done");
             if (check_file())
             {
@@ -254,52 +245,51 @@ private:
             {
                 STDCOUT("file check not ok");
             }
-            m_sock_listen.close();
+            m_can_clear = true;
         }
     }
 
-
+    ///run in a working thread
     bool check_file()
     {
         bool b_ret = false;
-        long size = get_filesize(m_filedata.get_full_file_path().c_str());
+        long size = get_filesize(m_sp_filedata->get_full_file_path().c_str());
         if (size == 0)
         {
             size = m_size;
         }
         if (size != m_size)
         {
-            ::truncate(m_filedata.get_full_file_path().c_str(), m_size);
+            ::truncate(m_sp_filedata->get_full_file_path().c_str(), m_size);
         }
-        std::string md5 = CMD5Checksum::GetMD5(m_filedata.get_full_file_path());
+        std::string md5 = CMD5Checksum::GetMD5(m_sp_filedata->get_full_file_path());
         if (strcmp(md5.c_str(), m_md5.c_str()) == 0)
         {
             if (!m_name.empty())
             {
-                ::rename(m_filedata.get_full_file_path().c_str(), (m_filedata.get_dir() + m_name).c_str());
+                ::rename(m_sp_filedata->get_full_file_path().c_str(),
+                        (m_sp_filedata->get_dir() + m_name).c_str());
             }
-            ::remove(m_filedata.get_full_infofile_path().c_str());
+            int ctrl = 0;
+            while (::remove(m_sp_filedata->get_full_infofile_path().c_str()) != 0)
+            {
+                if (ctrl++ > 5)
+                {
+                    LogUtils::get_instance()->log_multitype("non-timer----remove info file failed:", m_name);
+                    break;
+                }
+                TimeUtils::sleep_for_millis(200);
+            }
             b_ret = true;
+            LogUtils::get_instance()->log_multitype("non-timer----check md5 OK, all done:", m_name);
+        }
+        else
+        {
+            LogUtils::get_instance()->log_multitype("non-timer----check md5 failed delete all data:", m_name);
+            ::remove(m_sp_filedata->get_full_file_path().c_str());
+            ::remove(m_sp_filedata->get_full_infofile_path().c_str());
         }
         return b_ret;
-    }
-
-    bool neg_ok() //first time negotiate, file md5, name ,size, divided
-    {
-        if (!m_size || m_md5.empty())
-        {
-            return false;
-        }
-        return true;
-    }
-
-    std::string neg_backmsg()
-    {
-        std::string str_ser_data;
-        m_filedata.serialize_data(str_ser_data);
-        std::string str_out;
-        SimpleTransDataUtil::build_trans_data(str_out, str_ser_data.c_str(), str_ser_data.size());
-        return str_out;
     }
 
     void init_threadfunc()
@@ -307,111 +297,76 @@ private:
         //this pointer will be accessed by multi-threads
         m_threadfunc = [this](TransFileTcpRecv s) -> void
         {
-            if (neg_ok()) //transfer file data
+            if (s.piece_neg_ok())
             {
                 stringxa str_buff;
-                str_buff.resize(MEMORY_BUFF_LEN);
+                str_buff.resize(SimpleTransDataUtil::MAX_DATA_LEN);
                 while (true)
                 {
-                    if (s.piece_neg_ok()) //piece already negotiated, transfer data
+                    int recv_size = s.receive(str_buff);
+                    if (recv_size <= 0)
                     {
-                        int recv_size = s.receive(str_buff);
-                        if (recv_size <= 0)
+                        STDCERR("recv_size <= 0");
+                        LogUtils::get_instance()->log_multitype("recv piece data err, maybe close:", m_name, " errerno",
+                                                                std::strerror(errno));
                         {
-                            STDCERR("recv piece data err, maybe close");
-                            s.close();
-                            break;
+                            std::lock_guard<std::mutex> lock(m_mutex);
+                            STLUtils::delete_from_container(m_socks_trans, [&s](const int& sock) -> bool
+                            {
+                                return s.get_socket() == sock;
+                            });
                         }
-                        if (this->update_file_piece_data(str_buff.c_str(), recv_size, s.get_piece_info()))
-                        {
-                            //piece done
-                            s.close();
-                            this->one_piece_done();
-                            break;
-                        }
+                        s.close();
+                        break;
                     }
-                    else //piece not negotiated , this is first info come, sendback piece info(file offset, lenth)
+                    if (str_buff.empty())
                     {
-                        std::string str_neg;
-                        int recv_size = s.receive(str_neg);
-                        if (recv_size <= 0)
+                        STDCERR("DATA EEROR!!");
+                        //上层数据校验失败
+                        LogUtils::get_instance()->log_multitype("data check failed in one piece:", m_name, " errerno",
+                                                                std::strerror(errno));
                         {
-                            STDCERR("recv piece info err, maybe close");
-                            s.close();
-                            break;
+                            std::lock_guard<std::mutex> lock(m_mutex);
+                            STLUtils::delete_from_container(m_socks_trans, [&s](const int& sock) -> bool
+                            {
+                                return s.get_socket() == sock;
+                            });
                         }
-                        if (str_neg.empty())
+                        s.close();
+                        break;
+                    }
+                    if (this->update_file_piece_data(str_buff.c_str(), recv_size, s.get_piece_info()))
+                    {
+                        //piece done
                         {
-                            s.close();
-                            break;
+                            std::lock_guard<std::mutex> lock(m_mutex);
+                            STLUtils::delete_from_container(m_socks_trans, [&s](const int& sock) -> bool
+                            {
+                                return s.get_socket() == sock;
+                            });
                         }
-                        std::uint32_t sid = 0xffffffff;
-                        try
+                        s.receive(str_buff);//avoid time_wait
+                        s.close();
+                        this->one_piece_done();
+                        break;
+                    }
+                    if (!s.send("continue"))
+                    {
+                        STDCERR("!s.send()");
                         {
-                            sid = std::stoi(str_neg);
+                            std::lock_guard<std::mutex> lock(m_mutex);
+                            STLUtils::delete_from_container(m_socks_trans, [&s](const int& sock) -> bool
+                            {
+                                return s.get_socket() == sock;
+                            });
                         }
-                        catch (...)
-                        {
+                        s.close();
+                        LogUtils::get_instance()->log_multitype("sendback failed in one piece:", m_name, " errerno",
+                                std::strerror(errno));
+                        break;
+                    }
 
-                        }
-                        if (sid == 0xffffffff)
-                        {
-                            s.close();
-                            break;
-                        }
-                        s.init_piece_info(m_filedata.get_piece_info_by_sid(sid));
-                        s.set_check_data(false);
-                        std::string str_sendack;
-                        SimpleTransDataUtil::build_trans_data(str_sendack, str_neg.c_str(), str_neg.size());
-                        s.send(str_sendack);
-                    }
                 }
-            }
-            else //negotiating
-            {
-                stringxa str_buff;
-                s.receive(str_buff);
-                if (!str_buff.empty())
-                {
-                    std::vector<stringxa> vec_info;
-                    str_buff.split_string("|", vec_info);
-                    if (vec_info.size() >= 2)
-                    {
-                        if (vec_info[0].size() == 32) //md5
-                        {
-                            m_md5 = vec_info[0];
-                        }
-                        try
-                        {
-                            m_size = std::stoul(vec_info[1]);
-
-                        }
-                        catch (...)
-                        {
-
-                        }
-                        if (vec_info.size() > 2)
-                        {
-                            m_name = vec_info[2];
-                        }
-
-                    }
-                }
-                if (neg_ok())
-                {
-                    if (m_filedata.init(m_md5, m_size, m_pieces))
-                    {
-                        s.send(neg_backmsg());
-                    }
-                    else
-                    {
-                        m_md5.clear();
-                        m_size = 0;
-                        m_name.clear();
-                    }
-                }
-                s.close();
-
             }
             --m_thread_count;
         };

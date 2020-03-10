@@ -172,6 +172,7 @@ private:
 
                         tmplock.unlock();
                         m_log_stream << str_logs;
+                        m_log_stream.flush();
                     }
                     uninit_file();
                 }

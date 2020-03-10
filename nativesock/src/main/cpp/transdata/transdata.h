@@ -9,15 +9,21 @@
 #include <cstdint>
 #include "Crc32.h"
 
+//基于一个请求一个回答，并且每次数据传递均远小于tcp mss的一个简单协议数据校验。
 class SimpleTransDataUtil
 {
 public:
-#define MAGICNUM (char)0x77
+#define MAGICNUM 0x77
+    enum
+    {
+        MAX_ORI_DATA_LEN = 1 * 1024 * 1024,
+        MAX_DATA_LEN = 1 * 1024 * 1024 + 64,
+    };
 
-    //data_len < 0x80000000
+    //data_len <= MAX_DATA_LEN - 10
     static void build_trans_data(std::string& buff, const char* data, std::int32_t data_len)
     {
-        if (!data || data_len <= 0)
+        if (!data || data_len <= 0 || data_len > MAX_ORI_DATA_LEN)
         {
             return;
         }
@@ -51,10 +57,17 @@ public:
             return false;
         }
 
+        if (str_buff.size() > MAX_DATA_LEN)
+        {
+            str_buff = "";
+            return true;
+        }
+
         std::int8_t magic = str_buff[0];
         if (magic != MAGICNUM)
         {
-            return false;
+            str_buff = "";
+            return true;
         }
 
         std::int32_t len =

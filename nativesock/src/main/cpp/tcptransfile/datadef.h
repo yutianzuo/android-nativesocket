@@ -39,20 +39,23 @@ pbuff[7] = (std::int8_t)((int64value >> 56) & 0x00000000000000ff)
 (((std::int64_t)pbuff[6] & 0x00000000000000ff) << 48) |\
 (((std::int64_t)pbuff[7] & 0x00000000000000ff) << 56)
 
+#define TRANS_FILE_TYPE_FILE_HANDSHAKE "f_handshake"
+#define TRANS_FILE_TYPE_PIECE_HANDSHAKE "p_handshake"
 
 struct picec_info
 {
     picec_info(std::uint64_t pos, std::uint64_t len, std::uint64_t len_left, std::uint32_t id, char* p) :
-            begin_pos(pos), lenth(len), mapping(p), lenth_left(len_left), sid(id)
+            begin_pos(pos), lenth(len), mapping(p), lenth_left(len_left), sid(id), mapping_org(p)
     {}
     std::uint64_t begin_pos; //file offset from the beginning of the file
     std::uint64_t lenth; //piece len total
     std::uint64_t lenth_left; //piece len left
     std::uint32_t sid; //picec id
-    char* mapping = nullptr; //write pointer pos
+    char* mapping = (char*)MAP_FAILED; //write pointer pos, increased by recieved data.
+    char* mapping_org = (char*)MAP_FAILED; //begin of mapping address
     bool is_mapping_valid()
     {
-        return mapping != (char*)-1;
+        return mapping != (char*)MAP_FAILED;
     }
 };
 

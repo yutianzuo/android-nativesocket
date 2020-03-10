@@ -8,27 +8,27 @@
 #include "socketbase.h"
 #include <string.h>
 
-class ClinetSocket : public SocketBase
+class ClientSocket : public SocketBase
 {
 public:
 #if(__cplusplus >= 201103L)
 
-    ClinetSocket(const ClinetSocket &) = delete;
+    ClientSocket(const ClientSocket &) = delete;
 
-    ClinetSocket(ClinetSocket &&) = delete;
+    ClientSocket(ClientSocket &&) = delete;
 
-    void operator=(const ClinetSocket &) = delete;
+    void operator=(const ClientSocket &) = delete;
 
-    void operator=(ClinetSocket &&) = delete;
+    void operator=(ClientSocket &&) = delete;
 
 #endif
 
-    ClinetSocket() : SocketBase()
+    ClientSocket() : SocketBase()
     {
 
     }
 
-    virtual ~ClinetSocket()
+    virtual ~ClientSocket()
     {
 
     }

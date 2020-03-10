@@ -17,11 +17,11 @@
 #include <errno.h>
 #include <string.h>
 #include <poll.h>
+#include <cstring>
 #include "../transdata/transdata.h"
 
-#include "../android_utils.h"
-
-#define STDCERR LOGE
+#define STDCERR(msg) std::cerr<<"("<<__FILE__<<"--line"<<std::to_string(__LINE__)<<\
+")"<<msg<<":"<<std::strerror(errno)<<std::endl
 
 #define STDCOUT(msg) std::cout<<msg<<std::endl
 
@@ -31,8 +31,49 @@ class SocketBase
 public:
     enum
     {
-        MAXCONNECTIONS = 128, //bsd中如果设置backlog过小，并发会被服务端直接reset掉；然而linux的backlog含义跟bsd不一样。linux这里的长度
-        //是指等待accept的已经建立好的链接数；半连接维护在在另一个队列中，并且通过系统配置文件配置队列大小。
+        /**
+         * bsd:
+         *      The backlog argument defines the maximum length the queue of pending con-
+         * nections may grow to.  The	real maximum queue length will be 1.5 times
+         * more than the value specified in the backlog argument.  A subsequent
+         * listen() system call on the listening socket allows the caller to change
+         * the maximum queue length using a new backlog argument.  If	a connection
+         * request arrives with the queue full the client may	receive	an error with
+         * an	indication of ECONNREFUSED, or,	in the case of TCP, the	connection
+         * will be silently dropped.
+         *  Note that before FreeBSD 4.5 and the introduction of the syncache,	the
+         * backlog argument also determined the length of the	incomplete connection
+         * queue, which held TCP sockets in the process of completing	TCP's 3-way
+         * handshake.	 These incomplete connections are now held entirely in the
+         * syncache, which is	unaffected by queue lengths.  Inflated backlog values
+         * to	help handle denial of service attacks are no longer necessary.
+         */
+
+
+        /**
+         * linux:
+         *        The backlog argument defines the maximum length to which the queue of
+         * pending connections for sockfd may grow.  If a connection request
+         * arrives when the queue is full, the client may receive an error with
+         * an indication of ECONNREFUSED or, if the underlying protocol supports
+         * retransmission, the request may be ignored so that a later reattempt
+         * at connection succeeds.
+         *          The behavior of the backlog argument on TCP sockets changed with
+         * Linux 2.2.  Now it specifies the queue length for completely
+         * established sockets waiting to be accepted, instead of the number of
+         * incomplete connection requests.  The maximum length of the queue for
+         * incomplete sockets can be set using
+         * /proc/sys/net/ipv4/tcp_max_syn_backlog.  When syncookies are enabled
+         * there is no logical maximum length and this setting is ignored.  See
+         * tcp(7) for more information.
+         * If the backlog argument is greater than the value in
+         * /proc/sys/net/core/somaxconn, then it is silently truncated to that
+         * value; the default value in this file is 128.  In kernels before
+         * 2.4.25, this limit was a hard coded value, SOMAXCONN, with the value
+         * 128.
+         */
+
+        MAXCONNECTIONS = 128,
         MAXRECEIVEBUFF = 65536 * 3    //if test, = 4
     };
 
@@ -79,6 +120,7 @@ public:
         memcpy(&this->m_addr, &s.m_addr, sizeof(s.m_addr));
         s.m_sock = -1;
         memset((void *) (&s.m_addr), 0, sizeof(s.m_addr));
+        this->b_check_data = s.b_check_data;
     }
 
     void operator=(const SocketBase &) = delete;
@@ -422,6 +464,10 @@ public:
                     //check data completion
                     if (SimpleTransDataUtil::check_data(buff))
                     {
+                        if (!buff.empty())
+                        {
+                            status = buff.size();
+                        }
                         break;
                     }
                 }
@@ -432,6 +478,7 @@ public:
             }
             else if (status == 0)
             {
+                STDCERR("receive()status == 0");
                 break; //possible connection closed
             }
             else
@@ -469,18 +516,7 @@ public:
             if (status > 0)
             {
                 buff.append(buf, status);
-                if (b_check_data)
-                {
-                    //check
-                    if (SimpleTransDataUtil::check_data(buff))
-                    {
-                        break;
-                    }
-                }
-                else
-                {
-                    break;
-                }
+                break;
             }
             else
             {

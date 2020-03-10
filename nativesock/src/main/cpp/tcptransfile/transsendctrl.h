@@ -10,6 +10,7 @@
 #include "transfiletcpsender.h"
 #include "../transdata/CBMD5.h"
 #include "transrecvctrl.h"
+#include <mutex>
 
 class SendCtrl final
 {
@@ -55,14 +56,13 @@ public:
             }
             m_ip = str_ip;
             m_port = port;
-            std::string str_fileinfo = m_md5;
-            str_fileinfo += "|";
+            std::string str_fileinfo = std::string(TRANS_FILE_TYPE_FILE_HANDSHAKE) + "|" + m_md5 + "|";
             str_fileinfo += std::to_string(m_size);
             str_fileinfo += "|";
             std::string::size_type pos = m_file.find_last_of('/');
             std::string strname = pos == std::string::npos ? m_file : m_file.substr(m_file.find_last_of('/') + 1);
             str_fileinfo += strname;
-
+            STDCOUT(str_fileinfo);
             std::string str_build;
             SimpleTransDataUtil::build_trans_data(str_build, str_fileinfo.c_str(), str_fileinfo.size());
             if (!(sender_neg << str_build))
@@ -86,13 +86,19 @@ public:
                 FUNCTION_LEAVE;
             }
 
+            for (auto& piece : m_piece_infos)
+            {
+                m_size_left += piece.lenth_left;
+            }
+
             for (int i = 0; i < m_piece_infos.size(); ++i)
             {
-                if (m_piece_infos[i].lenth_left > 0) {
+                if (m_piece_infos[i].lenth_left > 0)
+                {
                     m_send_piece_threads.emplace_back(m_thread_function, i);
                 }
             }
-            STDCERR("%s%d", "threadcount is:", m_send_piece_threads.size());
+
             for (int j = 0; j < m_send_piece_threads.size(); ++j)
             {
                 m_send_piece_threads[j].join();
@@ -103,15 +109,25 @@ public:
         return b_ret;
     }
 
+    template <typename T>
+    void set_callback(T&& callback)
+    {
+        m_send_callback = std::forward<T>(callback);
+    }
+
 private:
     std::string m_ip;
     int m_port;
     std::string m_file;
     std::string m_md5;
     std::uint64_t m_size;
+    std::uint64_t m_size_left = 0;
+    std::uint64_t m_send_toll = 0;
     std::vector<picec_info> m_piece_infos;
     std::function<void(int)> m_thread_function;
     std::vector<std::thread> m_send_piece_threads;
+    std::mutex m_mutex;
+    std::function<void(std::uint64_t, std::uint64_t)> m_send_callback;
 
 
     void init_thread_func()
@@ -127,7 +143,8 @@ private:
             }
             std::string str_build;
             std::string str_sid = std::to_string(m_piece_infos[index].sid);
-            SimpleTransDataUtil::build_trans_data(str_build, str_sid.c_str(), str_sid.size());
+            std::string str_sendsid = std::string(TRANS_FILE_TYPE_PIECE_HANDSHAKE) + "|" + m_md5 + "|" + str_sid;
+            SimpleTransDataUtil::build_trans_data(str_build, str_sendsid.c_str(), str_sendsid.size());
             if (!(piece_sender << str_build))
             {
                 STDCERR("send piece info failed");
@@ -147,7 +164,7 @@ private:
                 piece_sender.close();
                 return;
             }
-            str_buff.resize(TransRecvCtrl::MEMORY_BUFF_LEN);
+            str_buff.resize(SimpleTransDataUtil::MAX_ORI_DATA_LEN);
             std::ifstream inputfile(m_file);
             if (!inputfile)
             {
@@ -155,12 +172,12 @@ private:
                 piece_sender.close();
                 return;
             }
+            piece_sender.set_check_data(false);
             inputfile.seekg(m_piece_infos[index].begin_pos + (m_piece_infos[index].lenth - m_piece_infos[index].lenth_left));
             bool loop = true;
-            std::ostringstream out;
-            out<<"piece info:"<< index << " " << m_piece_infos[index].lenth_left;
-            std::string outs = out.str();
-            STDCERR("%s", outs.data());
+            std::string str_receive_buff;
+            str_receive_buff.resize(50);
+            std::string str_send_data;
             while (loop)
             {
                 int read_len = m_piece_infos[index].lenth_left > str_buff.size() ? str_buff.size() : m_piece_infos[index].lenth_left;
@@ -168,29 +185,77 @@ private:
                 {
                     str_buff.resize(read_len);
                 }
-                STDCERR("read len is:%d", read_len);
                 if (!inputfile.read(&str_buff[0], read_len))
                 {
                     //eof probably, if eof state will be set to (eof|fail)
-                    STDCERR("read nothing");
+                    //should not be here
+                    LogUtils::get_instance()->log_multitype("read file error:", std::strerror
+                            (errno));
                     loop = false;
                 }
                 int len_real_read = inputfile.gcount();
                 if (len_real_read != read_len)
                 {
                     //should never be here
+                    LogUtils::get_instance()->log_multitype("read len != gcount:", std::strerror
+                            (errno));
                     STDCERR("read file error");
+                    break;
                 }
-                if (!(piece_sender << str_buff))
+
+                SimpleTransDataUtil::build_trans_data(str_send_data, str_buff.data(), str_buff.size());
+
+                if (!(piece_sender << str_send_data))
                 {
-                    STDCERR("send file error");
+                    STDCERR("send file error -- send");
+                    LogUtils::get_instance()->log_multitype("send file error:", std::strerror
+                            (errno));
                     piece_sender.close();
-                    loop = false;
+                    break;
+                }
+
+                {
+                    std::lock_guard<std::mutex> lock(m_mutex);
+                    m_send_toll += len_real_read;
+                }
+                if (m_send_callback)
+                {
+                    m_send_callback(m_send_toll, m_size_left);
                 }
                 m_piece_infos[index].lenth_left -= len_real_read;
-                if (m_piece_infos[index].lenth_left <= 0)
+                if (m_piece_infos[index].lenth_left == 0)
                 {
-                    loop = false;
+                    //before eof break while
+                    break;
+                }
+
+                /**
+                 * 真的出现了数据错乱的情况
+                 * 此问题表现为接收数据完成后md5校验失败。
+                 *
+                 * 出现前提：
+                 * 1、不采用分段数据一应一答（数据用crc校验，目前实现是带有校验的一问一答）
+                 * 2、以android端为上传端
+                 * 3、上传过程中（不插电），home到后台，过几秒，系统会自动关闭socket，这时server端没有收到fin
+                 * 4、上传端是流式不停上载
+                 * 5、这时候server端就会大概率出现数据错误（推测是发送端被系统回收后，buff中的数据被污染，然后被发送到了server）
+                 *
+                 * 追踪此问题花了5天时间，把所有代码review了几遍，并且写测试代码复现了很久。最后可以比较稳定复现的sender和server在test分支
+                 * sender需用android代码，也在test分支。
+                 *
+                 * 解决：
+                 * 1、数据分段上传，每段用数据校验，并且等待server回复，再传下一段
+                 * 2、crc校验一旦失败，server就关闭连接，这样就不会有脏数据污染数据文件，从而影响断点续传
+                 *
+                 * 一厢情愿的认为tcp协议栈可以保证什么，还是不靠谱，各个平台的实现都存在不同，不一定哪个平台，哪种特性就会给你惊喜。
+                 */
+                if (!(piece_sender >> str_receive_buff)) //wait for server check data to continue
+                {
+                    STDCERR("send file error -- receive");
+                    LogUtils::get_instance()->log_multitype("send file error-- receive back:", std::strerror
+                            (errno));
+                    piece_sender.close();
+                    break;
                 }
             }
             inputfile.close();
