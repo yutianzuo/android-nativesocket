@@ -11,6 +11,7 @@ import android.os.Bundle;
 import androidx.annotation.Nullable;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.content.FileProvider;
+import me.rosuh.filepicker.config.FilePickerManager;
 
 import android.os.Environment;
 import android.text.TextUtils;
@@ -26,6 +27,7 @@ import com.github.yutianzuo.nativesock.JniDef;
 
 import java.io.File;
 import java.io.InputStream;
+import java.util.List;
 
 public class SendFileActivity extends AppCompatActivity implements View.OnClickListener {
     public static final String IP_ADDR = "ip_addr";
@@ -33,7 +35,7 @@ public class SendFileActivity extends AppCompatActivity implements View.OnClickL
     String mFileSend;
     Button mBtnSend;
     EditText mEtIp;
-    static final int REQUEST_CODE = 999;
+    static final int MY_REQUEST_CODE = 999;
     String ip;
 
     private File getWechatDirFile() {
@@ -53,7 +55,14 @@ public class SendFileActivity extends AppCompatActivity implements View.OnClickL
 //        FileProviderUtils.setIntentDataAndType(this, intent, "*/*", wechat_dir, false);
 
 
-        startActivityForResult(intent, REQUEST_CODE);
+        startActivityForResult(intent, MY_REQUEST_CODE);
+    }
+
+    private void browserWithFilePicker() {
+        FilePickerManager.INSTANCE
+                .from(this)
+                .skipDirWhenSelect(false)
+                .forResult(FilePickerManager.REQUEST_CODE);
     }
 
     private String getShareFile() {
@@ -119,11 +128,18 @@ public class SendFileActivity extends AppCompatActivity implements View.OnClickL
     @Override
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
         super.onActivityResult(requestCode, resultCode, data);
-        if (requestCode == REQUEST_CODE && resultCode == Activity.RESULT_OK) {
+        if (requestCode == MY_REQUEST_CODE && resultCode == Activity.RESULT_OK) {
             Uri uri = data.getData();//得到uri，后面就是将uri转化成file的过程。
             String strPath = PathUtils.getImageAbsolutePath(this, uri);
             mTvSendFile.setText(strPath);
             mFileSend = strPath;
+        } else if (requestCode == FilePickerManager.REQUEST_CODE && resultCode == Activity.RESULT_OK) {
+            List<String> resultFiles = FilePickerManager.INSTANCE.obtainData();
+            if (resultFiles != null && resultFiles.size() > 0) {
+                String strPath = resultFiles.get(0);
+                mTvSendFile.setText(strPath);
+                mFileSend = strPath;
+            }
         }
     }
 
@@ -140,7 +156,8 @@ public class SendFileActivity extends AppCompatActivity implements View.OnClickL
     public void onClick(View v) {
         switch (v.getId()) {
             case R.id.tv_filesend:
-                browser();
+//                browser();
+                browserWithFilePicker();
                 break;
             case R.id.btn_send:
                 send();
@@ -157,7 +174,7 @@ public class SendFileActivity extends AppCompatActivity implements View.OnClickL
     Dialog dlg;
 
     private void send() {
-        if (TextUtils.isEmpty(mFileSend) || !new File(mFileSend).isFile()) {
+        if (TextUtils.isEmpty(mFileSend)) {
             Toast.makeText(this, "请选择文件", Toast.LENGTH_LONG).show();
             return;
         }

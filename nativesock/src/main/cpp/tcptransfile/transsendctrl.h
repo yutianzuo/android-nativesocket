@@ -15,7 +15,7 @@
 class SendCtrl final
 {
 public:
-    bool init(const std::string &str_file)
+    bool init(const std::string &str_file, const std::string& str_relative_parent)
     {
         init_thread_func();
         bool b_ret = false;
@@ -25,6 +25,7 @@ public:
                 FUNCTION_LEAVE;
             }
             m_file = str_file;
+            m_relative_parent = str_relative_parent;
             m_size = get_filesize(str_file.c_str());
             if (m_size <= 0)
             {
@@ -39,6 +40,7 @@ public:
         FUNCTION_END;
         STDCOUT("init file ok");
         STDCOUT(m_file);
+        STDCOUT(m_relative_parent);
         STDCOUT(m_md5);
         STDCOUT(m_size);
         return b_ret;
@@ -61,6 +63,7 @@ public:
             str_fileinfo += "|";
             std::string::size_type pos = m_file.find_last_of('/');
             std::string strname = pos == std::string::npos ? m_file : m_file.substr(m_file.find_last_of('/') + 1);
+            strname = m_relative_parent + strname;
             str_fileinfo += strname;
             STDCOUT(str_fileinfo);
             std::string str_build;
@@ -119,6 +122,7 @@ private:
     std::string m_ip;
     int m_port;
     std::string m_file;
+    std::string m_relative_parent;
     std::string m_md5;
     std::uint64_t m_size;
     std::uint64_t m_size_left = 0;

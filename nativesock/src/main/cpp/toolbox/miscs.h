@@ -21,6 +21,7 @@
 #include <pwd.h>
 #include <grp.h>
 #include <cstring>
+#include <dirent.h>
 
 #include "string_x.h"
 
@@ -364,6 +365,21 @@ bool get_app_path(std::string &str_app_path)
     return true;
 }
 
+inline bool get_app_cwd(std::string &str_cwd)
+{
+    char pPath[1024] = {0};
+    if (!::getcwd(pPath, 1024))
+    {
+        return false;
+    }
+    str_cwd.assign(pPath);
+    if (!str_cwd.empty() && str_cwd.find_last_of('/') != str_cwd.size() - 1)
+    {
+        str_cwd += "/";
+    }
+    return true;
+}
+
 inline
 bool get_current_formattime(stringxa &str_formattime)
 {
@@ -389,6 +405,61 @@ bool get_current_formattime(stringxa &str_formattime)
     FUNCTION_END;
     return b_ret;
 }
+
+/**
+ *
+ * @tparam FUNCTION
+ * @param str_file_path         absolute file path
+ * @param relative_parent       relative parent dir of file, e.g. "movie/" or "movie/love/"; first call of this function
+ *                              this param should be ""
+ * @param function              call back; first param is str_full_path, second param is relative parent str_relative_parent
+ *                              NO return value.
+ * @return
+ */
+template<typename FUNCTION>
+int enum_dir(const std::string &str_file_path, const std::string& relative_parent, FUNCTION &&function)
+{
+    if (!function || str_file_path.empty())
+    {
+        return -1;
+    }
+    if (1 == dir_file_exist(str_file_path.data())) //file
+    {
+        function(str_file_path, relative_parent);
+    }
+    else if (2 == dir_file_exist(str_file_path.data())) //dir
+    {
+        DIR *dir = ::opendir(str_file_path.data());
+        if (nullptr == dir)
+        {
+            return -3;
+        }
+        dirent* dirent;
+        int sub_call_ret = 0;
+        std::string sub_relative_parent = str_file_path;
+        sub_relative_parent.find_last_of("/") == sub_relative_parent.size() - 1 ?
+        sub_relative_parent = sub_relative_parent.erase(sub_relative_parent.size() - 1)
+        : sub_relative_parent;
+        sub_relative_parent = relative_parent +
+                sub_relative_parent.substr(sub_relative_parent.find_last_of('/') + 1) + "/";
+        while(nullptr != (dirent = ::readdir(dir)))
+        {
+            //this filtered hidden files && . && ..
+            if((!strncmp(dirent->d_name, ".", 1)) || (!strncmp(dirent->d_name, "..", 2)))
+                continue;
+            std::string str_sub_path = (str_file_path.find_last_of('/') != str_file_path.size() - 1) ? str_file_path :
+                    str_file_path.substr(0, str_file_path.size() - 1);
+            str_sub_path += "/";
+            str_sub_path += dirent->d_name;
+            if ((sub_call_ret = enum_dir(str_sub_path, sub_relative_parent, std::forward<FUNCTION>(function))) != 0)
+                break;
+        }
+        ::closedir(dir);
+        return sub_call_ret;
+    }
+    return 0;
+}
+
 
 class LogUtil
 {
