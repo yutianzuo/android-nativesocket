@@ -12,7 +12,7 @@ android {
     compileSdkVersion 28
     defaultConfig {
         applicationId "com.github.yutianzuo.nativesock"
-        minSdkVersion 20
+        minSdkVersion 17
         targetSdkVersion 22
         versionCode 20
         versionName "2.0"
