@@ -267,8 +267,17 @@ private:
         {
             if (!m_name.empty())
             {
-                ::rename(m_sp_filedata->get_full_file_path().c_str(),
-                        (m_sp_filedata->get_dir() + m_name).c_str());
+                std::string dst = m_sp_filedata->get_dir() + m_name;
+                if (dst.size() > 0 && dst[0] != '/')
+                {
+                    std::string str_apppath;
+                    if (get_app_cwd(str_apppath))
+                    {
+                        dst = str_apppath + dst;
+                    }
+                }
+                mkdir_recursively(dst.substr(0, dst.find_last_of('/') + 1).c_str());
+                ::rename(m_sp_filedata->get_full_file_path().c_str(), dst.c_str());
             }
             int ctrl = 0;
             while (::remove(m_sp_filedata->get_full_infofile_path().c_str()) != 0)

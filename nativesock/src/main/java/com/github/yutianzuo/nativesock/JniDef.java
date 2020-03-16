@@ -1,9 +1,18 @@
 package com.github.yutianzuo.nativesock;
 
+import android.os.Build.VERSION;
+
 import java.util.List;
+
+import static android.os.Build.VERSION_CODES.JELLY_BEAN_MR2;
 
 public class JniDef {
     static {
+        //bugs in linker, <= api18, we need link stl shared_library manually.
+        //a better way is use relinker:https://github.com/KeepSafe/ReLinker
+        if (VERSION.SDK_INT <= JELLY_BEAN_MR2) {
+            System.loadLibrary("c++_shared");
+        }
         System.loadLibrary("native_sock");
     }
 

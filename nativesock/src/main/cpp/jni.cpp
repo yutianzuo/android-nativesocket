@@ -151,7 +151,7 @@ jstring Java_com_github_yutianzuo_nativesock_JniDef_sendFile(JNIEnv *env, jclass
 
         stringxa str_filex(str_file);
         stringxa str_ipx(str_ip);
-        SendCtrl sendctrl;
+
 
         if (str_filex.empty()) {
             str_ret = "wrong params";
@@ -173,41 +173,47 @@ jstring Java_com_github_yutianzuo_nativesock_JniDef_sendFile(JNIEnv *env, jclass
             str_ipx = get_ip_str_from_str(str_ipx);
         }
 
-        if (!sendctrl.init(str_file)) {
-            str_ret = "file wrong, file exsist?";
-            FUNCTION_LEAVE;
-        }
-        auto func = [](std::uint64_t send, std::uint64_t toll) -> void
-        {
-            if (toll != 0)
+        std::function<void(const std::string&, const std::string&)> enum_func =
+        [str_ipx, &str_ret](const std::string& str_file_path, const std::string&
+        str_relative_parent) -> void {
+            SendCtrl sendctrl;
+            if (!sendctrl.init(str_file_path, str_relative_parent)) {
+                str_ret = "file wrong, file exsist?";
+                return;
+            }
+            auto func = [](std::uint64_t send, std::uint64_t toll) -> void
             {
-                double persent = (double) (send) / toll;
-                std::ostringstream output_persent;
-                output_persent.precision(2);
-                output_persent << std::fixed << "send progress:" << persent * 100 << "%";
+                if (toll != 0)
+                {
+                    double persent = (double) (send) / toll;
+                    std::ostringstream output_persent;
+                    output_persent.precision(2);
+                    output_persent << std::fixed << "send progress:" << persent * 100 << "%";
 
 
-                JNIEnvPtr jnienv_holder;
-                if (g_obj_send) {
-                    jclass clazz = jnienv_holder->GetObjectClass(g_obj_send);
-                    jmethodID method = jnienv_holder->GetMethodID(clazz, "callBack",
-                                                                  "(Ljava/lang/String;)V");
-                    jstring jout = nullptr;
-                    try {
-                        jout = jnienv_holder->NewStringUTF(output_persent.str().data());
-                    } catch (...) {
+                    JNIEnvPtr jnienv_holder;
+                    if (g_obj_send) {
+                        jclass clazz = jnienv_holder->GetObjectClass(g_obj_send);
+                        jmethodID method = jnienv_holder->GetMethodID(clazz, "callBack",
+                                                                      "(Ljava/lang/String;)V");
+                        jstring jout = nullptr;
+                        try {
+                            jout = jnienv_holder->NewStringUTF(output_persent.str().data());
+                        } catch (...) {
 
+                        }
+                        jnienv_holder->CallVoidMethod(g_obj_send, method, jout);
                     }
-                    jnienv_holder->CallVoidMethod(g_obj_send, method, jout);
                 }
+            };
+            sendctrl.set_callback(std::move(func));
+            if (!sendctrl.send_file(str_ipx, TransRecvCtrl::LISTENING_PORT)) {
+                str_ret = "send file error";
             }
         };
 
-        sendctrl.set_callback(std::move(func));
-        if (!sendctrl.send_file(str_ipx, TransRecvCtrl::LISTENING_PORT)) {
-            str_ret = "send file error";
-            FUNCTION_LEAVE;
-        }
+        enum_dir(str_filex, "", enum_func);
+
         str_ret = "send file all done";
 
         if (file) {
