@@ -422,7 +422,21 @@ public:
 #if defined(MSG_NOSIGNAL)
         n_flags = MSG_NOSIGNAL;
 #endif
-        int status = ::send(m_sock, data.c_str(), data.size(), n_flags);
+        int status = 0;
+        while (1) ///only for block socket
+        {
+            int ret = ::send(m_sock, data.c_str() + status, data.size() - status, n_flags);
+            if (ret == -1)
+            {
+                status = -1;
+                break;
+            }
+            status += ret;
+            if (status >= data.size())
+            {
+                break;
+            }
+        }
         //std::cout << "send()status:" << status << std::endl;
         return status != -1;
     }

@@ -125,7 +125,7 @@ public class WifiP2pDynamicOwnerActivity extends AppCompatActivity implements Wi
 
             @Override
             public void onFailure(int reasonCode) {
-                Log.e("wifi-p2p", "搜索设备失败");
+                Log.e("wifi-p2p", "搜索设备失败--" + reasonCode);
             }
         });
     }
@@ -156,7 +156,7 @@ public class WifiP2pDynamicOwnerActivity extends AppCompatActivity implements Wi
 
                 @Override
                 public void onFailure(int reason) {
-                    Toast.makeText(WifiP2pDynamicOwnerActivity.this, "connect调用失败" + reason,
+                    Toast.makeText(WifiP2pDynamicOwnerActivity.this, "connect调用失败--" + reason,
                             Toast.LENGTH_SHORT).show();
                 }
             });

@@ -51,6 +51,7 @@ public:
     {
         STDCOUT("~TransRecvCtrl");
         quit();
+        TimeUtils::sleep_for_millis(500);//avoid thread not quit
         m_sp_filedata->uninit();
     }
 
