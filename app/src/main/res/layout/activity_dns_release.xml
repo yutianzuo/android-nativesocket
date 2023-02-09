@@ -12,7 +12,7 @@
         android:layout_width="0dp"
         android:layout_height="64dp"
         android:layout_marginTop="10dp"
-        android:hint="input host:baidu.com"
+        android:hint="input host:isure6.stream.qqmusic.qq.com"
         android:inputType="text"
         android:textSize="32sp"
         app:layout_constraintLeft_toLeftOf="parent"
@@ -22,9 +22,10 @@
     <Button
         android:id="@+id/btn_confirm"
         android:layout_width="0dp"
-        android:layout_height="60dp"
+        android:layout_height="120dp"
         android:layout_marginTop="10dp"
         android:text="API优先查询"
+        android:textSize="48sp"
         app:layout_constraintLeft_toLeftOf="parent"
         app:layout_constraintRight_toRightOf="parent"
         app:layout_constraintTop_toBottomOf="@+id/host_input" />
@@ -32,8 +33,9 @@
     <Button
         android:id="@+id/btn_confirm_public"
         android:layout_width="0dp"
-        android:layout_height="60dp"
+        android:layout_height="120dp"
         android:layout_marginTop="10dp"
+        android:textSize="48sp"
         android:text="公共DNS优先查询"
         app:layout_constraintLeft_toLeftOf="parent"
         app:layout_constraintRight_toRightOf="parent"
@@ -43,12 +45,24 @@
     <Button
         android:id="@+id/btn_test"
         android:layout_width="0dp"
-        android:layout_height="60dp"
+        android:layout_height="120dp"
         android:layout_marginTop="10dp"
         app:layout_constraintLeft_toLeftOf="parent"
         app:layout_constraintRight_toRightOf="parent"
+        android:textSize="48sp"
         android:text="OKHTTPTest"
         app:layout_constraintTop_toBottomOf="@+id/btn_confirm_public" />
+
+    <Button
+        android:id="@+id/btn_back"
+        android:layout_width="0dp"
+        android:layout_height="120dp"
+        android:layout_marginTop="10dp"
+        app:layout_constraintLeft_toLeftOf="parent"
+        app:layout_constraintRight_toRightOf="parent"
+        android:textSize="48sp"
+        android:text="返回"
+        app:layout_constraintTop_toBottomOf="@+id/btn_test" />
 
     <ListView
         android:id="@+id/list"
@@ -58,6 +72,6 @@
         app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintLeft_toLeftOf="parent"
         app:layout_constraintRight_toRightOf="parent"
-        app:layout_constraintTop_toBottomOf="@+id/btn_test" />
+        app:layout_constraintTop_toBottomOf="@+id/btn_back" />
 
 </androidx.constraintlayout.widget.ConstraintLayout>

@@ -96,6 +96,7 @@ public class DnsReleaseActivity extends AppCompatActivity {
         final Button btn = findViewById(R.id.btn_confirm);
         final Button btn_public = findViewById(R.id.btn_confirm_public);
         final Button btn_oktest = findViewById(R.id.btn_test);
+        final Button btn_back = findViewById(R.id.btn_back);
 
         final EditText etHost = findViewById(R.id.host_input);
 
@@ -108,13 +109,15 @@ public class DnsReleaseActivity extends AppCompatActivity {
         btn.setOnClickListener(new OnClickListener() {
             @Override
             public void onClick(View v) {
+                mData.clear();
+                mAdpter.notifyDataSetChanged();
                 new Thread(new Runnable() {
                     @Override
                     public void run() {
                         String host = etHost.getText().toString();
 
                         if (TextUtils.isEmpty(host)) {
-                            host = "baidu.com";
+                            host = "isure6.stream.qqmusic.qq.com";
                         }
 
 
@@ -134,13 +137,15 @@ public class DnsReleaseActivity extends AppCompatActivity {
         btn_public.setOnClickListener(new OnClickListener() {
             @Override
             public void onClick(View v) {
+                mData.clear();
+                mAdpter.notifyDataSetChanged();
                 new Thread(new Runnable() {
                     @Override
                     public void run() {
                         String host = etHost.getText().toString();
 
                         if (TextUtils.isEmpty(host)) {
-                            host = "baidu.com";
+                            host = "isure6.stream.qqmusic.qq.com";
                         }
 
 
@@ -163,10 +168,22 @@ public class DnsReleaseActivity extends AppCompatActivity {
                 httpRequest();
             }
         });
+
+        btn_back.setOnClickListener(new OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                DnsReleaseActivity.this.finish();
+            }
+        });
     }
 
     void refresh(int[] ips) {
         mData.clear();
+        if (ips == null) {
+            Toast.makeText(this, "没有解析到ip，确认域名输入是否正确", Toast.LENGTH_LONG).show();
+            mAdpter.notifyDataSetChanged();
+            return;
+        }
         for (int ip : ips) {
             InetAddress addr = InetAddresses.fromInteger(ip);
             mData.add(addr.getHostAddress());
@@ -180,7 +197,7 @@ public class DnsReleaseActivity extends AppCompatActivity {
         //创建一个Request
         Request request = new Request.Builder()
                 .get()
-                .url("https://example.com")
+                .url("https://devgw.tai.qq.com/accountsvc3/")
                 .build();
         //通过client发起请求
         client.newCall(request).enqueue(new Callback() {

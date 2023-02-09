@@ -10,7 +10,7 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:hint="dns server:8.8.8.8"
-        android:textSize="32dp"
+        android:textSize="56dp"
         />
 
     <EditText
@@ -20,15 +20,16 @@
         android:layout_below="@+id/dns_input"
         android:layout_marginTop="10dp"
         android:hint="input host:baidu.com"
-        android:textSize="32dp"
+        android:textSize="56dp"
         />
 
     <Button
         android:id="@+id/btn_confirm"
         android:layout_width="match_parent"
-        android:layout_height="42dp"
+        android:layout_height="120dp"
         android:layout_below="@+id/host_input"
         android:layout_marginTop="10dp"
+        android:textSize="48sp"
         android:text="查询"/>
 
     <ListView

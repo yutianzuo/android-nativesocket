@@ -14,6 +14,8 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
     Button mButtonNetChoose;
     Button mButtonP2p;
 
+    Button mButtonExit;
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -22,12 +24,14 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
         mButtonDnsRelease = findViewById(R.id.btn_dns_release);
         mButtonNetChoose = findViewById(R.id.btn_netchoose);
         mButtonP2p = findViewById(R.id.btn_p2p);
+        mButtonExit = findViewById(R.id.btn_exit);
 
 
         mButtonDns.setOnClickListener(this);
         mButtonNetChoose.setOnClickListener(this);
         mButtonP2p.setOnClickListener(this);
         mButtonDnsRelease.setOnClickListener(this);
+        mButtonExit.setOnClickListener(this);
 
     }
 
@@ -45,6 +49,9 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
                 break;
             case R.id.btn_dns_release:
                 dnsRelease();
+                break;
+            case R.id.btn_exit:
+                finish();
                 break;
         }
     }

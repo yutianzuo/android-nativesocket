@@ -9,6 +9,10 @@ android {
             storePassword '123456'
         }
     }
+    compileOptions {
+        sourceCompatibility 1.8
+        targetCompatibility 1.8
+    }
     compileSdkVersion 28
     defaultConfig {
         applicationId "com.github.yutianzuo.nativesock"
@@ -43,7 +47,7 @@ android {
 
 dependencies {
     implementation fileTree(dir: 'libs', include: ['*.jar'])
-    implementation 'me.rosuh:AndroidFilePicker:0.6.1'
+    implementation 'me.rosuh:AndroidFilePicker:0.8.2'
     implementation 'androidx.appcompat:appcompat:1.1.0'
     implementation 'com.squareup.okhttp3:okhttp:3.12.0'
     implementation 'com.squareup.okio:okio:1.15.0'
