@@ -4,8 +4,7 @@ import com.google.common.net.InetAddresses;
 
 import android.annotation.SuppressLint;
 import android.os.Bundle;
-import androidx.annotation.Nullable;
-import androidx.appcompat.app.AppCompatActivity;
+import android.os.Environment;
 import android.text.TextUtils;
 import android.util.Log;
 import android.view.View;
@@ -20,15 +19,21 @@ import android.widget.Toast;
 
 import com.github.yutianzuo.nativesock.Dns;
 
+import java.io.File;
+import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.net.InetAddress;
 import java.net.UnknownHostException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 
+import androidx.annotation.Nullable;
+import androidx.appcompat.app.AppCompatActivity;
 import okhttp3.Call;
 import okhttp3.Callback;
+import okhttp3.Headers;
 import okhttp3.HttpUrl;
 import okhttp3.Interceptor;
 import okhttp3.OkHttpClient;
@@ -37,6 +42,7 @@ import okhttp3.Response;
 
 @SuppressLint("Registered")
 public class DnsReleaseActivity extends AppCompatActivity {
+    private final static String TAG = "DnsReleaseActivity";
     List<String> mData;
     class MyListAdpter extends BaseAdapter {
 
@@ -83,6 +89,8 @@ public class DnsReleaseActivity extends AppCompatActivity {
 
     private ListView mListView;
     private MyListAdpter mAdpter;
+
+    private EditText etHost;
     @Override
     protected void onCreate(@Nullable Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -98,7 +106,7 @@ public class DnsReleaseActivity extends AppCompatActivity {
         final Button btn_oktest = findViewById(R.id.btn_test);
         final Button btn_back = findViewById(R.id.btn_back);
 
-        final EditText etHost = findViewById(R.id.host_input);
+        etHost = findViewById(R.id.host_input);
 
         ///custom parameters---optional
 //        Dns.getInstance().addServerIP("1.1.1.1");
@@ -165,7 +173,8 @@ public class DnsReleaseActivity extends AppCompatActivity {
         btn_oktest.setOnClickListener(new OnClickListener() {
             @Override
             public void onClick(View v) {
-                httpRequest();
+//                httpRequest();
+                httpDownLoad();
             }
         });
 
@@ -191,9 +200,113 @@ public class DnsReleaseActivity extends AppCompatActivity {
         mAdpter.notifyDataSetChanged();
     }
 
+    private String isExistDir(String saveDir) throws IOException {
+        // 下载位置
+        File downloadFile = new File(Environment.getExternalStorageDirectory(), saveDir);
+        downloadFile.mkdirs();
+        return downloadFile.getAbsolutePath();
+    }
+
+    void httpDownLoad() {
+        String url = etHost.getText().toString();
+        if (TextUtils.isEmpty(url)) {
+            Toast.makeText(this, "url empty!", Toast.LENGTH_LONG).show();
+//            url = "https://isure6.stream.qqmusic.qq.com/C200004QxGK535eBMZ.m4a?guid=2000000177&vkey=9874767806F82DE1AF27559782AC0EE3AAEB602198EFBE4F03E1C3312C85C2E80DA824BAB95552B98ABFA17763932CA6C4548A4BDC3C4639&uin=0&fromtag=20177";
+            return;
+        }
+        final String urlRecord = url + "\n";
+        Toast.makeText(DnsReleaseActivity.this, "download will start!",
+                Toast.LENGTH_LONG).show();
+        try {
+            OkHttpClient client = OkhttpClientUtils.getClient(false);
+            Request request = new Request.Builder()
+                    .get()
+                    .url(url)
+                    .build();
+            client.newCall(request).enqueue(new Callback() {
+                @Override
+                public void onFailure(Call call, IOException e) {
+                    Toast.makeText(DnsReleaseActivity.this, "download failed!",
+                            Toast.LENGTH_LONG).show();
+                }
+
+                @Override
+                public void onResponse(Call call, Response response) throws IOException {
+                    InputStream is = null;
+                    byte[] buf = new byte[2048];
+                    int len = 0;
+                    FileOutputStream fos = null;
+                    FileOutputStream fHeaderOs = null;
+                    // 储存下载文件的目录
+                    String savePath = isExistDir("wecarflow-qqmusic-debug");
+                    try {
+                        is = response.body().byteStream();
+                        long total = response.body().contentLength();
+                        long time = System.currentTimeMillis();
+                        File file = new File(savePath,
+                                "qqmusic-debug-" + time + ".m4a");
+                        File headerFile = new File(savePath, "qqmusic-debug-" + time + ".header");
+                        fHeaderOs = new FileOutputStream(headerFile);
+                        fHeaderOs.write(urlRecord.getBytes(), 0, urlRecord.getBytes().length);
+                        Headers headers = response.headers();
+                        for(String headerName : headers.names()) {
+                            String out = headerName + ":" + response.header(headerName) + "\n";
+                            Log.d(TAG, out);
+                            fHeaderOs.write(out.getBytes(), 0, out.getBytes().length);
+                        }
+                        fHeaderOs.flush();
+
+                        fos = new FileOutputStream(file);
+                        long sum = 0;
+                        while ((len = is.read(buf)) != -1) {
+                            fos.write(buf, 0, len);
+                            sum += len;
+                            int progress = (int) (sum * 1.0f / total * 100);
+                            // 下载中
+                            Log.d(TAG, "download progress: " + progress);
+                        }
+                        fos.flush();
+                        // 下载完成
+                        DnsReleaseActivity.this.runOnUiThread(new Runnable() {
+                            @Override
+                            public void run() {
+                                Toast.makeText(DnsReleaseActivity.this, "download done!",
+                                        Toast.LENGTH_LONG).show();
+                            }
+                        });
+
+                    } catch (Exception e) {
+                        DnsReleaseActivity.this.runOnUiThread(new Runnable() {
+                            @Override
+                            public void run() {
+                                Toast.makeText(DnsReleaseActivity.this, "download error!",
+                                        Toast.LENGTH_LONG).show();
+                            }
+                        });
+                    } finally {
+                        try {
+                            if (is != null)
+                                is.close();
+                        } catch (IOException e) {
+                        }
+                        try {
+                            if (fos != null)
+                                fos.close();
+                            if (fHeaderOs != null)
+                                fHeaderOs.close();
+                        } catch (IOException e) {
+                        }
+                    }
+                }
+            });
+        } catch (Throwable e) {
+            Log.d(TAG, "download exp: " + e.getMessage());
+        }
+    }
+
 
     void httpRequest() {
-        OkHttpClient client = OkhttpClientUtils.getClient();
+        OkHttpClient client = OkhttpClientUtils.getClient(true);
         //创建一个Request
         Request request = new Request.Builder()
                 .get()
@@ -236,30 +349,32 @@ public class DnsReleaseActivity extends AppCompatActivity {
 class OkhttpClientUtils {
     public static final int TIME_OUT = 15 * 1000;
 
-    public static OkHttpClient getClient() {
+    public static OkHttpClient getClient(boolean useDns) {
         OkHttpClient client = null;
         OkHttpClient.Builder builder = new OkHttpClient.Builder();
         builder.connectTimeout(TIME_OUT, TimeUnit.SECONDS);
         builder.readTimeout(TIME_OUT, TimeUnit.SECONDS);
         builder.writeTimeout(TIME_OUT, TimeUnit.SECONDS);
         builder.retryOnConnectionFailure(false);
-        builder.dns(new okhttp3.Dns() {
-            @Override
-            public List<InetAddress> lookup(String hostname) throws UnknownHostException {
-                try {
-                    int[] ips = Dns.getInstance().getHostIPFirstByPublicDNSServer(hostname);
-                    List<InetAddress> addrs = new ArrayList<>();
-                    for (int ip : ips) {
-                        InetAddress addr = InetAddresses.fromInteger(ip);
-                        addrs.add(addr);
+        if (useDns) {
+            builder.dns(new okhttp3.Dns() {
+                @Override
+                public List<InetAddress> lookup(String hostname) throws UnknownHostException {
+                    try {
+                        int[] ips = Dns.getInstance().getHostIPFirstByPublicDNSServer(hostname);
+                        List<InetAddress> addrs = new ArrayList<>();
+                        for (int ip : ips) {
+                            InetAddress addr = InetAddresses.fromInteger(ip);
+                            addrs.add(addr);
+                        }
+                        return addrs;
+                    } catch (Throwable e) {
+                        Log.e("httpRequest", "custom dns exp:" + e.toString());
+                        return SYSTEM.lookup(hostname);
                     }
-                    return addrs;
-                } catch (Throwable e) {
-                    Log.e("httpRequest", "custom dns exp:" + e.toString());
-                    return SYSTEM.lookup(hostname);
                 }
-            }
-        });
+            });
+        }
 //        builder.dns(okhttp3.Dns.SYSTEM);
 //        builder.addInterceptor(new CustomInterceptor());
         client = builder.build();
