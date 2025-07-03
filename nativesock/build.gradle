@@ -6,8 +6,6 @@ android {
     defaultConfig {
         minSdkVersion 17
         targetSdkVersion 28
-        versionCode 1
-        versionName "1.0"
 
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
 
@@ -30,7 +28,6 @@ android {
 
     buildTypes {
         debug {
-            debuggable false
             externalNativeBuild {
                 cmake {
                     cppFlags "-fvisibility=hidden -Wall -Wextra"

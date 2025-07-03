@@ -13,7 +13,7 @@ android {
         sourceCompatibility 1.8
         targetCompatibility 1.8
     }
-    compileSdkVersion 28
+    compileSdkVersion 30
     defaultConfig {
         applicationId "com.github.yutianzuo.nativesock"
         minSdkVersion 17
