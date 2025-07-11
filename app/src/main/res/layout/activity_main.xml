@@ -9,44 +9,39 @@
     <Button
         android:id="@+id/btn_dns"
         android:layout_width="match_parent"
-        android:layout_height="120dp"
-        android:textSize="48sp"
+        android:layout_height="60dp"
         android:text="Dns查询"/>
 
     <Button
         android:id="@+id/btn_dns_release"
         android:layout_width="match_parent"
-        android:layout_height="120dp"
+        android:layout_height="60dp"
         android:layout_below="@+id/btn_dns"
         android:layout_marginTop="20dp"
-        android:textSize="48sp"
         android:text="正式DNS查询API"/>
 
     <Button
         android:id="@+id/btn_netchoose"
         android:layout_width="match_parent"
-        android:layout_height="120dp"
+        android:layout_height="60dp"
         android:layout_below="@+id/btn_dns_release"
         android:layout_marginTop="20dp"
-        android:textSize="48sp"
         android:text="Android-Drop"/>
 
     <Button
         android:id="@+id/btn_p2p"
         android:layout_width="match_parent"
-        android:layout_height="120dp"
+        android:layout_height="60dp"
         android:layout_below="@+id/btn_netchoose"
         android:layout_marginTop="20dp"
-        android:textSize="48sp"
         android:text="平等P2P组网"/>
 
     <Button
         android:id="@+id/btn_exit"
         android:layout_width="match_parent"
-        android:layout_height="120dp"
+        android:layout_height="60dp"
         android:layout_below="@+id/btn_p2p"
         android:layout_marginTop="20dp"
-        android:textSize="48sp"
         android:text="退出"/>
 
 </RelativeLayout>
